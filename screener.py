@@ -58,9 +58,20 @@ class Screener:
         progress_callback: Optional[ProgressCallback] = None,
     ) -> List[StockResult]:
         tickers = self.universe_source.get_tickers(TARGET_EXCHANGES)
-        total = len(tickers)
-        if progress_callback:
-            progress_callback(0, total, f"Loaded {total} tickers from target exchanges")
+
+         if progress_callback:
+          progress_callback(0, len(tickers), "Pre-filtering by price/volume...")
+
+        tickers = get_prefiltered_tickers(
+         tickers,
+         max_price=params.max_price,
+         min_dollar_volume=params.min_dollar_volume,
+          )
+
+total = len(tickers)
+if progress_callback:
+    progress_callback(0, total, f"{total} tickers passed pre-filter")
+
 
         # -------- المرحلة الجديدة: جلب كل بيانات الأسعار دفعة وحدة --------
         if progress_callback:
