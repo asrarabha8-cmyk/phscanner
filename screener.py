@@ -7,7 +7,6 @@ those layers knows about the other (Clean Architecture).
 """
 
 import logging
-from data_sources.prefilter_source import get_prefiltered_tickers
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from typing import Callable, List, Optional
@@ -22,10 +21,11 @@ from data_sources.base import (
     UniverseSource,
 )
 from data_sources.news_source import YFinanceKeywordNewsSource
-from data_sources.price_source import YFinancePriceSource
-from data_sources.reverse_split_source import YFinanceReverseSplitSource
+from data_sources.price_source import FinnhubPriceSource
+from data_sources.reverse_split_source import FinnhubReverseSplitSource
 from data_sources.short_interest_source import CompositeShortInterestSource
 from data_sources.universe_source import NasdaqTraderUniverseSource
+from data_sources.prefilter_source import get_prefiltered_tickers
 from analysis.support_detector import SupportDetector
 from analysis.volume_analyzer import VolumeAnalyzer
 from analysis.scorer import PhoenixScorer
@@ -45,9 +45,9 @@ class Screener:
         short_interest_source: Optional[ShortInterestSource] = None,
         max_workers: int = 8,
     ):
-        self.price_source = price_source or YFinancePriceSource()
+        self.price_source = price_source or FinnhubPriceSource()
         self.universe_source = universe_source or NasdaqTraderUniverseSource()
-        self.reverse_split_source = reverse_split_source or YFinanceReverseSplitSource()
+        self.reverse_split_source = reverse_split_source or FinnhubReverseSplitSource()
         self.news_source = news_source or YFinanceKeywordNewsSource()
         self.short_interest_source = short_interest_source or CompositeShortInterestSource()
         self.max_workers = max_workers
@@ -59,19 +59,18 @@ class Screener:
     ) -> List[StockResult]:
         tickers = self.universe_source.get_tickers(TARGET_EXCHANGES)
 
-         if progress_callback:
-          progress_callback(0, len(tickers), "Pre-filtering by price/volume...")
+        if progress_callback:
+            progress_callback(0, len(tickers), "Pre-filtering by price/volume...")
 
         tickers = get_prefiltered_tickers(
-         tickers,
-         max_price=params.max_price,
-         min_dollar_volume=params.min_dollar_volume,
-          )
+            tickers,
+            max_price=params.max_price,
+            min_dollar_volume=params.min_dollar_volume,
+        )
 
-total = len(tickers)
-if progress_callback:
-    progress_callback(0, total, f"{total} tickers passed pre-filter")
-
+        total = len(tickers)
+        if progress_callback:
+            progress_callback(0, total, f"{total} tickers passed pre-filter")
 
         # -------- المرحلة الجديدة: جلب كل بيانات الأسعار دفعة وحدة --------
         if progress_callback:
