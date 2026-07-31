@@ -23,7 +23,8 @@ class ScreenerParams:
     exclude_impactful_news: bool = True
 
     # فلاتر أداء مسبقة (ليست من متطلبات المستخدم المباشرة لكنها ضرورية عمليًا)
-    max_price: float = 20.0
+    max_price: float = 10.00
+    min_price: float = 1.0
     min_dollar_volume: float = 300_000
     max_results: int = 50
 
