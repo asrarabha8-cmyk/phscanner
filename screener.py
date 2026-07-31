@@ -66,7 +66,9 @@ class Screener:
             tickers,
             max_price=params.max_price,
             min_dollar_volume=params.min_dollar_volume,
-        )
+            min_price=params.min_price,
+             )
+
 
         total = len(tickers)
         if progress_callback:
