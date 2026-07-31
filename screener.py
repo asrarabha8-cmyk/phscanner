@@ -1,12 +1,12 @@
-
+"""
 screener.py
 -------------
-المنسّق الرئيسي (Orchestrator). هذه الطبقة الوحيدة التي "تعرف" كل الطبقات
-الأخرى وتجمعها معًا؛ كل طبقة أخرى (data_sources / analysis) لا تعرف شيئًا
-عن الطبقات الشقيقة لها. هذا هو مبدأ Clean Architecture المطلوب.
+Main orchestrator. This is the only layer that knows about both the
+data_sources and analysis layers and wires them together; neither of
+those layers knows about the other (Clean Architecture).
 
-الاستخدام:
-    screener = Screener()  # يستخدم المصادر الافتراضية (yfinance + NASDAQ Trader)
+Usage:
+    screener = Screener()  # uses default sources (yfinance + NASDAQ Trader)
     results = screener.run(params, progress_callback=...)
 """
 
@@ -48,8 +48,8 @@ class Screener:
         short_interest_source: Optional[ShortInterestSource] = None,
         max_workers: int = 8,
     ):
-        # Dependency Injection: يمكن استبدال أي مصدر بيانات بسهولة (اختبارات
-        # وحدة، أو تغيير مزوّد البيانات في المستقبل) دون تعديل هذا الملف.
+        # Dependency Injection: any data source can be swapped without
+        # touching this file (e.g. for unit tests or a new data provider).
         self.price_source = price_source or YFinancePriceSource()
         self.universe_source = universe_source or NasdaqTraderUniverseSource()
         self.reverse_split_source = reverse_split_source or YFinanceReverseSplitSource()
@@ -65,7 +65,7 @@ class Screener:
         tickers = self.universe_source.get_tickers(TARGET_EXCHANGES)
         total = len(tickers)
         if progress_callback:
-            progress_callback(0, total, f"تم تحميل {total} رمز من الأسواق المستهدفة")
+            progress_callback(0, total, f"Loaded {total} tickers from target exchanges")
 
         results: List[StockResult] = []
         done_count = 0
@@ -84,7 +84,7 @@ class Screener:
                     if result is not None:
                         results.append(result)
                 except Exception as exc:  # noqa: BLE001
-                    logger.warning("خطأ غير متوقع أثناء تحليل %s: %s", ticker, exc)
+                    logger.warning("Unexpected error analyzing %s: %s", ticker, exc)
 
                 if progress_callback and done_count % 10 == 0:
                     progress_callback(done_count, total, ticker)
@@ -106,14 +106,14 @@ class Screener:
         if avg_dollar_volume < params.min_dollar_volume:
             return None
 
-        # -------- شرط 1: Reverse Split --------
+        # -------- Condition 1: Reverse Split --------
         reverse_split = self.reverse_split_source.get_recent_reverse_splits(
             ticker, params.reverse_split_lookback_days, date.today()
         )
         if reverse_split is None:
             return None
 
-        # -------- شرط 5-8: الدعم الحقيقي --------
+        # -------- Conditions 5-8: real support --------
         detector = SupportDetector()
         support_zone = detector.detect(
             df,
@@ -129,29 +129,30 @@ class Screener:
         if distance_from_support_pct > params.max_distance_from_support_pct:
             return None
         if distance_from_support_pct < 0:
-            # السعر تحت منتصف الدعم فعليًا (حتى لو لم يُغلق تحت zone_low)
-            # لا يزال مقبولاً، لكن سالب جدًا قد يعني كسر ضمني — نتركه كما هو
+            # Price is below the zone midpoint even without breaking zone_low.
+            # Still acceptable, but a very negative value could imply an
+            # implicit break -- left as-is for now.
             pass
 
-        # -------- شرط 9-10: الفوليوم --------
+        # -------- Conditions 9-10: volume --------
         volume_analyzer = VolumeAnalyzer(rvol_window=RVOL_AVERAGE_WINDOW)
         volume_profile = volume_analyzer.analyze(df, support_zone.base_days)
 
-        # -------- شرط 2: استبعاد الأخبار المؤثرة --------
+        # -------- Condition 2: exclude impactful news --------
         if params.exclude_impactful_news:
             news_check = self.news_source.check_impactful_news(ticker, lookback_days=14)
             if news_check.has_impactful_news:
                 return None
 
-        # -------- شرط 3-4: Short Float / Borrow Fee --------
+        # -------- Conditions 3-4: Short Float / Borrow Fee --------
         short_interest = self.short_interest_source.get_short_interest(ticker)
         if params.min_short_float_pct is not None and short_interest.short_float_pct is not None:
             if short_interest.short_float_pct < params.min_short_float_pct:
                 return None
-        # إذا لم تكن بيانات Short Float متاحة، لا نستبعد السهم (المرحلة 1
-        # لا تملك مصدرًا مجانيًا موثوقًا لهذه النسبة - راجع short_interest_source.py)
+        # If short float data isn't available, we don't exclude the stock
+        # (Phase 1 has no reliable free source for this -- see short_interest_source.py)
 
-        # -------- التسجيل النهائي --------
+        # -------- Final scoring --------
         scorer = PhoenixScorer(tolerance_pct=params.support_tolerance_pct)
         score = scorer.score(reverse_split, support_zone, volume_profile)
 
