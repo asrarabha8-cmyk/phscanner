@@ -7,6 +7,7 @@ those layers knows about the other (Clean Architecture).
 """
 
 import logging
+from data_sources.prefilter_source import get_prefiltered_tickers
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from typing import Callable, List, Optional
