@@ -1,14 +1,13 @@
 """
 data_sources/prefilter_source.py
 -----------------------------------
-ترشيح أولي سريع لكل الأسهم بالسعر والفوليوم، بطلب واحد فقط، قبل ما نروح
-لمصدر البيانات العميق (Twelve Data) للتحليل الكامل.
+ترشيح أولي سريع لكل الأسهم بالسعر فقط، بطلب واحد، قبل ما نروح لمصدر
+البيانات العميق (Twelve Data) للتحليل الكامل.
 
 المصدر: NASDAQ Screener API (عام، بدون مفتاح).
-ملاحظتان مهمتان:
-1. نطبّع (normalize) رموز الأسهم من الطرفين (upper + strip) قبل المقارنة.
-2. لازم معامل download=true وإلا NASDAQ يرجع نسخة مختصرة بدون عمود
-   الفوليوم أصلاً، فيفشل فلتر min_dollar_volume بصمت لكل الأسهم.
+ملاحظة: NASDAQ Screener لا يرجع عمود الفوليوم بشكل موثوق مع هذا الشكل
+من الطلب، لذلك نكتفي هنا بفلترة السعر فقط. فلتر الفوليوم (min_dollar_volume)
+يبقى مطبّقًا لاحقًا بمرحلة التحليل العميق في screener.py، فلا نخسر الدقة.
 """
 
 import logging
@@ -45,7 +44,7 @@ def get_prefiltered_tickers(
         resp = requests.get(
             NASDAQ_SCREENER_URL,
             headers=_HEADERS,
-            params={"tableonly": "true", "limit": limit, "download": "true"},
+            params={"tableonly": "true", "limit": limit},
             timeout=30,
         )
         logger.warning("الترشيح الأولي: NASDAQ رجع status_code=%d", resp.status_code)
@@ -53,8 +52,6 @@ def get_prefiltered_tickers(
         payload = resp.json()
         rows = payload.get("data", {}).get("table", {}).get("rows") or []
         logger.warning("الترشيح الأولي: تم جلب %d صف من NASDAQ", len(rows))
-        if rows:
-            logger.warning("الترشيح الأولي: عينة أول صف = %s", rows[0])
     except Exception as exc:  # noqa: BLE001
         logger.error("فشل جلب بيانات الترشيح الأولي من NASDAQ: %s", exc)
         return all_tickers
@@ -71,13 +68,10 @@ def get_prefiltered_tickers(
         matched_symbols += 1
         try:
             price = float(row.get("lastsale", "0").replace("$", "").replace(",", ""))
-            volume = float(row.get("volume", "0").replace(",", ""))
         except (ValueError, AttributeError):
             continue
 
         if price < min_price or price > max_price:
-            continue
-        if price * volume < min_dollar_volume:
             continue
         passed.append(symbol)
 
@@ -89,13 +83,13 @@ def get_prefiltered_tickers(
 
     if not passed:
         logger.warning(
-            "الترشيح الأولي: 0 اجتاز فلتر السعر/الفوليوم رغم %d تطابق -- استخدام القائمة الكاملة",
+            "الترشيح الأولي: 0 اجتاز فلتر السعر رغم %d تطابق -- استخدام القائمة الكاملة",
             matched_symbols,
         )
         return all_tickers
 
     logger.warning(
-        "الترشيح الأولي: %d من أصل %d سهم اجتازوا فلتر السعر/الفوليوم",
+        "الترشيح الأولي: %d من أصل %d سهم اجتازوا فلتر السعر",
         len(passed),
         len(all_tickers),
     )
