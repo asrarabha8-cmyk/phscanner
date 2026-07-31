@@ -2,11 +2,9 @@
 data_sources/prefilter_source.py
 -----------------------------------
 ترشيح أولي سريع لكل الأسهم بالسعر والفوليوم، بطلب واحد فقط، قبل ما نروح
-لمصدر البيانات العميق (Finnhub) للتحليل الكامل.
+لمصدر البيانات العميق (Twelve Data) للتحليل الكامل.
 
 المصدر: NASDAQ Screener API (عام، بدون مفتاح).
-ملاحظة: إذا فشل هذا المصدر أو رجع بيانات فاضية/غير متطابقة، نرجع القائمة
-الكاملة كـ fallback آمن بدل ما نستبعد كل الأسهم بالغلط.
 """
 
 import logging
@@ -33,6 +31,7 @@ def get_prefiltered_tickers(
     all_tickers: List[str],
     max_price: float,
     min_dollar_volume: float,
+    min_price: float = 1.0,
     limit: int = 8000,
 ) -> List[str]:
     tickers_set: Set[str] = set(all_tickers)
@@ -45,40 +44,49 @@ def get_prefiltered_tickers(
             params={"tableonly": "true", "limit": limit},
             timeout=30,
         )
+        logger.warning("الترشيح الأولي: NASDAQ رجع status_code=%d", resp.status_code)
         resp.raise_for_status()
         payload = resp.json()
         rows = payload.get("data", {}).get("table", {}).get("rows") or []
         logger.warning("الترشيح الأولي: تم جلب %d صف من NASDAQ", len(rows))
+        if rows:
+            logger.warning("الترشيح الأولي: عينة أول صف = %s", rows[0])
     except Exception as exc:  # noqa: BLE001
         logger.error("فشل جلب بيانات الترشيح الأولي من NASDAQ: %s", exc)
         return all_tickers
 
     if not rows:
-        # رجعت بيانات فاضية (حظر صامت أو تغيير بالـ API) -- fallback آمن
-        logger.warning("الترشيح الأولي: لا توجد صفوف، سيتم استخدام القائمة الكاملة")
+        logger.warning("الترشيح الأولي: لا توجد صفوف، استخدام القائمة الكاملة")
         return all_tickers
 
+    matched_symbols = 0
     for row in rows:
         symbol = row.get("symbol", "").strip()
         if symbol not in tickers_set:
             continue
+        matched_symbols += 1
         try:
             price = float(row.get("lastsale", "0").replace("$", "").replace(",", ""))
             volume = float(row.get("volume", "0").replace(",", ""))
         except (ValueError, AttributeError):
             continue
 
-        if price <= 0 or price > max_price:
+        if price < min_price or price > max_price:
             continue
         if price * volume < min_dollar_volume:
             continue
         passed.append(symbol)
 
+    logger.warning(
+        "الترشيح الأولي: %d صف تطابقت رموزهم من أصل %d صف",
+        matched_symbols,
+        len(rows),
+    )
+
     if not passed:
-        # رجعت صفوف لكن التطابق فشل بالكامل (مثلاً اختلاف شكل الرموز) -- fallback آمن
         logger.warning(
-            "الترشيح الأولي: 0 تطابق من أصل %d صف رغم النجاح -- استخدام القائمة الكاملة",
-            len(rows),
+            "الترشيح الأولي: 0 اجتاز فلتر السعر/الفوليوم رغم %d تطابق -- استخدام القائمة الكاملة",
+            matched_symbols,
         )
         return all_tickers
 
