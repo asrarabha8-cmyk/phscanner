@@ -1,10 +1,11 @@
 """
 app.py
 --------
-نقطة الدخول لواجهة Streamlit. هذا الملف مسؤول فقط عن العرض والتفاعل؛
-كل المنطق الفعلي موجود في screener.py وطبقات analysis / data_sources.
+Entry point for the Streamlit UI. This file is responsible only for
+display and interaction; all real logic lives in screener.py and the
+analysis / data_sources layers.
 
-تشغيل المشروع:
+To run:
     pip install -r requirements.txt
     streamlit run app.py
 """
@@ -38,30 +39,30 @@ st.set_page_config(page_title="Phoenix Scanner", layout="wide")
 
 st.title("🔥 Phoenix Scanner")
 st.caption(
-    "اكتشاف أسهم التجميع الأمريكية قبل الانفجار السعري — يعتمد على سلوك السعر "
-    "ومناطق الدعم الحقيقية وحجم التداول فقط، بدون RSI / MACD / Stochastic."
+    "Discover US accumulation stocks before the breakout -- based purely on "
+    "price behavior, real support zones, and volume. No RSI / MACD / Stochastic."
 )
 
 # ----------------------------------------------------------------------
-# الشريط الجانبي: كل المعايير القابلة للتحكم
+# Sidebar: every tunable filter
 # ----------------------------------------------------------------------
 with st.sidebar:
-    st.header("⚙️ معايير الفلترة")
+    st.header("⚙️ Screening Criteria")
 
     reverse_split_lookback = st.selectbox(
-        "نطاق Reverse Split (يوم)",
+        "Reverse Split lookback (days)",
         REVERSE_SPLIT_LOOKBACK_OPTIONS,
         index=REVERSE_SPLIT_LOOKBACK_OPTIONS.index(DEFAULT_REVERSE_SPLIT_LOOKBACK),
     )
 
     min_touches = st.selectbox(
-        "عدد الارتدادات الأدنى من الدعم",
+        "Minimum touches on support",
         TOUCHES_OPTIONS,
         index=TOUCHES_OPTIONS.index(DEFAULT_MIN_TOUCHES),
     )
 
     tolerance_pct = st.slider(
-        "سماحية منطقة الدعم (Tolerance %)",
+        "Support zone tolerance (%)",
         min_value=0.5,
         max_value=5.0,
         value=DEFAULT_SUPPORT_TOLERANCE_PCT,
@@ -69,51 +70,51 @@ with st.sidebar:
     )
 
     min_base_days = st.selectbox(
-        "أقل مدة للقاعدة (جلسة)",
+        "Minimum base duration (sessions)",
         BASE_DAYS_OPTIONS,
         index=BASE_DAYS_OPTIONS.index(DEFAULT_MIN_BASE_DAYS),
     )
 
     max_distance = st.selectbox(
-        "أقصى مسافة من الدعم (%)",
+        "Max distance from support (%)",
         DISTANCE_FROM_SUPPORT_OPTIONS,
         index=DISTANCE_FROM_SUPPORT_OPTIONS.index(int(DEFAULT_MAX_DISTANCE_FROM_SUPPORT)),
     )
 
     st.divider()
 
-    enable_short_float = st.checkbox("تفعيل فلتر Short Float", value=False)
+    enable_short_float = st.checkbox("Enable Short Float filter", value=False)
     min_short_float = None
     if enable_short_float:
         min_short_float = st.selectbox(
-            "أقل نسبة Short Float (%)",
+            "Minimum Short Float (%)",
             SHORT_FLOAT_OPTIONS,
             index=SHORT_FLOAT_OPTIONS.index(DEFAULT_SHORT_FLOAT_MIN),
         )
         st.caption(
-            "⚠️ بيانات Short Float غير متوفرة مجانًا في هذه المرحلة لكل الأسهم. "
-            "سيُطبَّق الفلتر فقط على الأسهم التي تتوفر لها بيانات."
+            "Short Float data isn't freely available for every ticker in this "
+            "phase. The filter only applies to tickers where data is available."
         )
 
-    exclude_news = st.checkbox("استبعاد الأسهم ذات الأخبار المؤثرة", value=True)
+    exclude_news = st.checkbox("Exclude stocks with impactful news", value=True)
 
     st.divider()
-    st.subheader("فلاتر أداء (لتسريع الفحص)")
+    st.subheader("Performance filters (to speed up scanning)")
     max_price = st.number_input(
-        "أقصى سعر للسهم ($)", min_value=1.0, max_value=500.0, value=DEFAULT_MAX_PRICE
+        "Max stock price ($)", min_value=1.0, max_value=500.0, value=DEFAULT_MAX_PRICE
     )
     min_dollar_volume = st.number_input(
-        "أقل سيولة يومية بالدولار ($)",
+        "Min daily dollar volume ($)",
         min_value=0.0,
         value=float(DEFAULT_MIN_DOLLAR_VOLUME),
         step=50_000.0,
     )
-    max_results = st.slider("أقصى عدد نتائج معروضة", 10, 100, 50, step=10)
+    max_results = st.slider("Max results shown", 10, 100, 50, step=10)
 
-    run_button = st.button("🚀 بدء الفحص", type="primary", use_container_width=True)
+    run_button = st.button("🚀 Run Scan", type="primary", use_container_width=True)
 
 # ----------------------------------------------------------------------
-# التنفيذ
+# Execution
 # ----------------------------------------------------------------------
 if run_button:
     params = ScreenerParams(
@@ -135,9 +136,9 @@ if run_button:
     def _on_progress(done: int, total: int, current: str):
         ratio = 0.0 if total == 0 else min(done / total, 1.0)
         progress_bar.progress(ratio)
-        status_text.text(f"تم فحص {done}/{total} — آخر رمز: {current}")
+        status_text.text(f"Scanned {done}/{total} -- last ticker: {current}")
 
-    with st.spinner("جاري الفحص... قد يستغرق هذا عدة دقائق حسب حجم السوق"):
+    with st.spinner("Scanning... this can take several minutes depending on market size"):
         screener = Screener()
         results = screener.run(params, progress_callback=_on_progress)
 
@@ -145,9 +146,9 @@ if run_button:
     status_text.empty()
 
     if not results:
-        st.warning("لم يتم العثور على أسهم مطابقة للشروط الحالية. جرّب تخفيف الفلاتر.")
+        st.warning("No matching stocks found. Try loosening the filters.")
     else:
-        st.success(f"✅ تم العثور على {len(results)} سهم مطابق")
+        st.success(f"✅ Found {len(results)} matching stocks")
         rows = [r.to_row() for r in results]
         df_results = pd.DataFrame(rows)
         st.dataframe(
@@ -156,4 +157,4 @@ if run_button:
             hide_index=True,
         )
 else:
-    st.info("اضبط المعايير من الشريط الجانبي ثم اضغط «بدء الفحص».")
+    st.info("Set your criteria in the sidebar, then click \"Run Scan\".")
