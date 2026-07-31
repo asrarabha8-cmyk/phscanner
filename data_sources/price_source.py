@@ -1,81 +1,114 @@
 """
 data_sources/price_source.py
 -----------------------------
-تنفيذ PriceDataSource باستخدام Finnhub API (خطة مجانية، يحتاج مفتاح API
-مخزّن بـ Streamlit secrets تحت اسم FINNHUB_API_KEY).
+تنفيذ PriceDataSource باستخدام Twelve Data API (خطة مجانية، تحتاج مفتاح
+API مخزّن بـ Streamlit secrets تحت اسم TWELVEDATA_API_KEY).
 
-يستخدم rate limiter مشترك (finnhub_client.py) مع بقية مصادر Finnhub
-لتفادي تجاوز حد 60 طلب/دقيقة الإجمالي لكل مفتاح API.
+حدود الخطة المجانية: 8 طلبات/دقيقة و 800 طلب/يوم لكل مفتاح.
+لهذا السبب الترشيح الأولي (تصغير عدد الأسهم قبل الوصول هنا) ضروري --
+بدونه يستحيل تغطية آلاف الأسهم بحدود هذه الخطة.
 """
 
 import logging
+import time
+import threading
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List
 
 import pandas as pd
 import requests
+import streamlit as st
 
 from data_sources.base import PriceDataSource
-from data_sources.finnhub_client import FINNHUB_BASE_URL, get_api_key, throttle
 
 logger = logging.getLogger(__name__)
 
+TWELVEDATA_BASE_URL = "https://api.twelvedata.com"
 
-class FinnhubPriceSource(PriceDataSource):
+# أقل من 8/دقيقة بهامش أمان
+_MAX_CALLS_PER_MINUTE = 7
+_MIN_INTERVAL_SECONDS = 60.0 / _MAX_CALLS_PER_MINUTE
+
+_lock = threading.Lock()
+_last_call_time = 0.0
+
+
+def _throttle():
+    """يضمن عدم تجاوز حد الطلبات بالدقيقة عبر كل الـ threads مجتمعة."""
+    global _last_call_time
+    with _lock:
+        elapsed = time.time() - _last_call_time
+        if elapsed < _MIN_INTERVAL_SECONDS:
+            time.sleep(_MIN_INTERVAL_SECONDS - elapsed)
+        _last_call_time = time.time()
+
+
+class TwelveDataPriceSource(PriceDataSource):
     def __init__(self):
-        self.api_key = get_api_key()
+        self.api_key = st.secrets["TWELVEDATA_API_KEY"]
 
     def get_history(self, ticker: str, period: str = "1y") -> Optional[pd.DataFrame]:
-        throttle()
+        _throttle()
         try:
-            end = datetime.now()
-            start = end - timedelta(days=400)  # هامش أمان فوق سنة
-
             resp = requests.get(
-                f"{FINNHUB_BASE_URL}/stock/candle",
+                f"{TWELVEDATA_BASE_URL}/time_series",
                 params={
                     "symbol": ticker,
-                    "resolution": "D",
-                    "from": int(start.timestamp()),
-                    "to": int(end.timestamp()),
-                    "token": self.api_key,
+                    "interval": "1day",
+                    "outputsize": 400,  # هامش أمان فوق سنة تداول
+                    "apikey": self.api_key,
                 },
                 timeout=15,
             )
             resp.raise_for_status()
             data = resp.json()
 
-            if data.get("s") != "ok":
-                # "no_data" أو أي حالة غير ناجحة
+            if data.get("status") == "error" or "values" not in data:
+                logger.warning(
+                    "فشل جلب بيانات السعر (Twelve Data) لـ %s: %s",
+                    ticker,
+                    data.get("message", "بدون تفاصيل"),
+                )
                 return None
 
-            df = pd.DataFrame(
-                {
-                    "Open": data["o"],
-                    "High": data["h"],
-                    "Low": data["l"],
-                    "Close": data["c"],
-                    "Volume": data["v"],
-                },
-                index=pd.to_datetime(data["t"], unit="s"),
+            values = data["values"]
+            if not values:
+                return None
+
+            df = pd.DataFrame(values)
+            df["datetime"] = pd.to_datetime(df["datetime"])
+            df.set_index("datetime", inplace=True)
+            df.sort_index(inplace=True)  # Twelve Data يرجع الأحدث أولًا
+
+            df = df.rename(
+                columns={
+                    "open": "Open",
+                    "high": "High",
+                    "low": "Low",
+                    "close": "Close",
+                    "volume": "Volume",
+                }
             )
+            for col in ["Open", "High", "Low", "Close", "Volume"]:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+
+            df = df[["Open", "High", "Low", "Close", "Volume"]].copy()
             df.dropna(inplace=True)
             if len(df) < 15:
                 return None
             return df
 
         except Exception as exc:  # noqa: BLE001
-            logger.warning("فشل جلب بيانات السعر (Finnhub) لـ %s: %s", ticker, exc)
+            logger.warning("فشل جلب بيانات السعر (Twelve Data) لـ %s: %s", ticker, exc)
             return None
 
     def get_history_batch(
         self, tickers: List[str], period: str = "1y", batch_size: int = 100
     ) -> Dict[str, Optional[pd.DataFrame]]:
         """
-        Finnhub ما عنده bulk endpoint حقيقي بالخطة المجانية، فنطلب سهم
-        سهم مع throttling مشترك يحترم حد 60 طلب/دقيقة الإجمالي.
-        batch_size موجود هنا فقط للتوافق مع الواجهة المستخدمة بـ
-        screener.py -- غير مستخدم فعليًا بهذا التنفيذ.
+        Twelve Data المجاني ما فيه bulk endpoint حقيقي، فنطلب سهم سهم مع
+        throttling يحترم حد 8 طلبات/دقيقة و800 طلب/يوم. batch_size هنا
+        موجود فقط للتوافق مع الواجهة المستخدمة بـ screener.py.
         """
         results: Dict[str, Optional[pd.DataFrame]] = {}
         for ticker in tickers:
