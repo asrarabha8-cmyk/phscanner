@@ -5,6 +5,9 @@ data_sources/prefilter_source.py
 لمصدر البيانات العميق (Twelve Data) للتحليل الكامل.
 
 المصدر: NASDAQ Screener API (عام، بدون مفتاح).
+ملاحظة: نطبّع (normalize) رموز الأسهم من الطرفين (upper + strip) قبل
+المقارنة، لأن اختلاف الحالة (case) أو المسافات الزائدة بين مصدرين
+مختلفين يسبب فشل تطابق كامل رغم نجاح الطلب.
 """
 
 import logging
@@ -34,7 +37,7 @@ def get_prefiltered_tickers(
     min_price: float = 1.0,
     limit: int = 8000,
 ) -> List[str]:
-    tickers_set: Set[str] = set(all_tickers)
+    tickers_set: Set[str] = {t.strip().upper() for t in all_tickers}
     passed: List[str] = []
 
     try:
@@ -61,7 +64,7 @@ def get_prefiltered_tickers(
 
     matched_symbols = 0
     for row in rows:
-        symbol = row.get("symbol", "").strip()
+        symbol = row.get("symbol", "").strip().upper()
         if symbol not in tickers_set:
             continue
         matched_symbols += 1
