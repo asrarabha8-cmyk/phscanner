@@ -4,10 +4,6 @@ screener.py
 Main orchestrator. This is the only layer that knows about both the
 data_sources and analysis layers and wires them together; neither of
 those layers knows about the other (Clean Architecture).
-
-Usage:
-    screener = Screener()  # uses default sources (yfinance + NASDAQ Trader)
-    results = screener.run(params, progress_callback=...)
 """
 
 import logging
@@ -48,8 +44,6 @@ class Screener:
         short_interest_source: Optional[ShortInterestSource] = None,
         max_workers: int = 8,
     ):
-        # Dependency Injection: any data source can be swapped without
-        # touching this file (e.g. for unit tests or a new data provider).
         self.price_source = price_source or YFinancePriceSource()
         self.universe_source = universe_source or NasdaqTraderUniverseSource()
         self.reverse_split_source = reverse_split_source or YFinanceReverseSplitSource()
@@ -67,12 +61,22 @@ class Screener:
         if progress_callback:
             progress_callback(0, total, f"Loaded {total} tickers from target exchanges")
 
+        # -------- المرحلة الجديدة: جلب كل بيانات الأسعار دفعة وحدة --------
+        if progress_callback:
+            progress_callback(0, total, "Fetching price data in batches...")
+
+        price_data = self.price_source.get_history_batch(
+            tickers, period=PRICE_HISTORY_PERIOD, batch_size=100
+        )
+
         results: List[StockResult] = []
         done_count = 0
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             future_map = {
-                executor.submit(self._process_ticker, ticker, params): ticker
+                executor.submit(
+                    self._process_ticker, ticker, params, price_data.get(ticker)
+                ): ticker
                 for ticker in tickers
             }
 
@@ -93,8 +97,10 @@ class Screener:
         return results[: params.max_results]
 
     # ----------------------------------------------------------------
-    def _process_ticker(self, ticker: str, params: ScreenerParams) -> Optional[StockResult]:
-        df = self.price_source.get_history(ticker, period=PRICE_HISTORY_PERIOD)
+    def _process_ticker(
+        self, ticker: str, params: ScreenerParams, df=None
+    ) -> Optional[StockResult]:
+        # df يوصل جاهز من الـ batch fetch بدل ما يُطلب من الشبكة هنا
         if df is None or df.empty:
             return None
 
@@ -128,11 +134,6 @@ class Screener:
         distance_from_support_pct = (last_price - zone_mid) / zone_mid * 100
         if distance_from_support_pct > params.max_distance_from_support_pct:
             return None
-        if distance_from_support_pct < 0:
-            # Price is below the zone midpoint even without breaking zone_low.
-            # Still acceptable, but a very negative value could imply an
-            # implicit break -- left as-is for now.
-            pass
 
         # -------- Conditions 9-10: volume --------
         volume_analyzer = VolumeAnalyzer(rvol_window=RVOL_AVERAGE_WINDOW)
@@ -149,8 +150,6 @@ class Screener:
         if params.min_short_float_pct is not None and short_interest.short_float_pct is not None:
             if short_interest.short_float_pct < params.min_short_float_pct:
                 return None
-        # If short float data isn't available, we don't exclude the stock
-        # (Phase 1 has no reliable free source for this -- see short_interest_source.py)
 
         # -------- Final scoring --------
         scorer = PhoenixScorer(tolerance_pct=params.support_tolerance_pct)
