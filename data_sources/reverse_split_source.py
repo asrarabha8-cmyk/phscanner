@@ -1,47 +1,66 @@
 """
 data_sources/reverse_split_source.py
 --------------------------------------
-يستخرج تاريخ آخر Reverse Split من بيانات yfinance (Ticker.splits).
-
-ملاحظة مهمة: yfinance يعطي "split ratio" حيث:
-  ratio > 1  => Split عادي (تجزيء) — مثال 2.0 يعني 2-for-1
-  ratio < 1  => Reverse Split — مثال 0.1 يعني 1-for-10
-هذا المشروع يهتم فقط بالحالة الثانية (ratio < 1).
+يستخرج تاريخ آخر Reverse Split من Finnhub API (endpoint: /stock/split).
+يستخدم rate limiter مشترك مع بقية مصادر Finnhub لتفادي تجاوز حد
+60 طلب/دقيقة الإجمالي.
 """
 
 import logging
 from datetime import date, timedelta
 from typing import Optional
 
+import requests
+
 from data_sources.base import ReverseSplitSource
+from data_sources.finnhub_client import FINNHUB_BASE_URL, get_api_key, throttle
 from core.models import ReverseSplitInfo
 
 logger = logging.getLogger(__name__)
 
 
-class YFinanceReverseSplitSource(ReverseSplitSource):
+class FinnhubReverseSplitSource(ReverseSplitSource):
+    def __init__(self):
+        self.api_key = get_api_key()
+
     def get_recent_reverse_splits(
         self, ticker: str, lookback_days: int, as_of: date
     ) -> Optional[ReverseSplitInfo]:
+        throttle()
         try:
-            import yfinance as yf
+            start = as_of - timedelta(days=lookback_days)
 
-            splits = yf.Ticker(ticker).splits
-            if splits is None or splits.empty:
+            resp = requests.get(
+                f"{FINNHUB_BASE_URL}/stock/split",
+                params={
+                    "symbol": ticker,
+                    "from": start.isoformat(),
+                    "to": as_of.isoformat(),
+                    "token": self.api_key,
+                },
+                timeout=15,
+            )
+            resp.raise_for_status()
+            splits = resp.json()
+
+            if not splits:
                 return None
 
-            cutoff = as_of - timedelta(days=lookback_days)
-            reverse_splits = splits[splits < 1.0]
-            if reverse_splits.empty:
+            # نهتم فقط بالـ Reverse Split: toFactor < fromFactor
+            # مثال: 1-for-10 يعني fromFactor=10, toFactor=1 -> ratio = 1/10 = 0.1
+            reverse_splits = [
+                s for s in splits
+                if s.get("fromFactor", 0) > s.get("toFactor", 0) and s.get("toFactor", 0) > 0
+            ]
+            if not reverse_splits:
                 return None
 
-            # آخر Reverse Split زمنيًا
-            last_date = reverse_splits.index[-1].date()
-            if last_date < cutoff:
-                return None
+            last = max(reverse_splits, key=lambda s: s["date"])
+            ratio = last["toFactor"] / last["fromFactor"]
+            split_date = date.fromisoformat(last["date"])
 
-            ratio = float(reverse_splits.iloc[-1])
-            return ReverseSplitInfo(split_date=last_date, ratio=ratio)
+            return ReverseSplitInfo(split_date=split_date, ratio=ratio)
+
         except Exception as exc:  # noqa: BLE001
-            logger.warning("فشل جلب بيانات Reverse Split لـ %s: %s", ticker, exc)
+            logger.warning("فشل جلب بيانات Reverse Split (Finnhub) لـ %s: %s", ticker, exc)
             return None
