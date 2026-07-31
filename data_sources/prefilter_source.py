@@ -5,9 +5,10 @@ data_sources/prefilter_source.py
 لمصدر البيانات العميق (Twelve Data) للتحليل الكامل.
 
 المصدر: NASDAQ Screener API (عام، بدون مفتاح).
-ملاحظة: نطبّع (normalize) رموز الأسهم من الطرفين (upper + strip) قبل
-المقارنة، لأن اختلاف الحالة (case) أو المسافات الزائدة بين مصدرين
-مختلفين يسبب فشل تطابق كامل رغم نجاح الطلب.
+ملاحظتان مهمتان:
+1. نطبّع (normalize) رموز الأسهم من الطرفين (upper + strip) قبل المقارنة.
+2. لازم معامل download=true وإلا NASDAQ يرجع نسخة مختصرة بدون عمود
+   الفوليوم أصلاً، فيفشل فلتر min_dollar_volume بصمت لكل الأسهم.
 """
 
 import logging
@@ -44,7 +45,7 @@ def get_prefiltered_tickers(
         resp = requests.get(
             NASDAQ_SCREENER_URL,
             headers=_HEADERS,
-            params={"tableonly": "true", "limit": limit},
+            params={"tableonly": "true", "limit": limit, "download": "true"},
             timeout=30,
         )
         logger.warning("الترشيح الأولي: NASDAQ رجع status_code=%d", resp.status_code)
