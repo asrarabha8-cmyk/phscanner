@@ -2,8 +2,14 @@
 data_sources/reverse_split_source.py
 --------------------------------------
 يستخرج تاريخ آخر Reverse Split من Finnhub API (endpoint: /stock/split).
-يستخدم rate limiter مشترك مع بقية مصادر Finnhub لتفادي تجاوز حد
-60 طلب/دقيقة الإجمالي.
+
+يستخدم rate limiter مشترك (finnhub_client.py) مع بقية مصادر Finnhub
+لتفادي تجاوز حد 60 طلب/دقيقة الإجمالي لكل مفتاح API.
+
+ملاحظة: Finnhub يرجع fromFactor و toFactor لكل split.
+  fromFactor > toFactor  => Reverse Split (مثال: fromFactor=10, toFactor=1
+                             يعني 1-for-10، أي ratio = toFactor/fromFactor = 0.1)
+  fromFactor < toFactor  => Split عادي (تجزيء) -- لا يهمنا بهذا المشروع
 """
 
 import logging
@@ -46,8 +52,7 @@ class FinnhubReverseSplitSource(ReverseSplitSource):
             if not splits:
                 return None
 
-            # نهتم فقط بالـ Reverse Split: toFactor < fromFactor
-            # مثال: 1-for-10 يعني fromFactor=10, toFactor=1 -> ratio = 1/10 = 0.1
+            # نهتم فقط بالـ Reverse Split
             reverse_splits = [
                 s for s in splits
                 if s.get("fromFactor", 0) > s.get("toFactor", 0) and s.get("toFactor", 0) > 0
