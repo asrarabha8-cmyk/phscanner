@@ -25,7 +25,7 @@ class ScreenerParams:
     # فلاتر أداء مسبقة (ليست من متطلبات المستخدم المباشرة لكنها ضرورية عمليًا)
     max_price: float = 10.00
     min_price: float = 1.0
-        max_market_cap: float = 300_000_000  # 300 مليون دولار كبداية
+    max_market_cap: float = 300_000_000  # 300 مليون دولار كبداية
     min_dollar_volume: float = 300_000
     max_results: int = 50
 
