@@ -9,7 +9,8 @@ those layers knows about the other (Clean Architecture).
 1. الترشيح الأولي بالسعر/القيمة السوقية (NASDAQ Screener، مجاني وسريع)
 2. فحص Reverse Split (Finnhub) -- يقلل العدد بشكل كبير قبل الخطوة الأثقل
 3. جلب السعر التاريخي (Twelve Data) -- فقط على الأسهم اللي عندها Reverse Split فعلاً
-4. باقي التحليل (Support, Volume, News, Short Interest) على العدد الصغير النهائي
+4. باقي التحليل (Support, Volume, News, Short Interest، وفلتر الصعود بعد
+   التقسيم) على العدد الصغير النهائي
 """
 
 import logging
@@ -166,6 +167,30 @@ class Screener:
         return results[: params.max_results]
 
     # ----------------------------------------------------------------
+    def _check_post_split_rise(
+        self, df, split_date: date, max_rise_pct: float
+    ) -> bool:
+        """
+        يتحقق أن السهم لم يصعد أكثر من max_rise_pct% مباشرة بعد تاريخ
+        الـ Reverse Split. يقارن أعلى سعر (High) بعد التقسيم بسعر أول
+        إغلاق (Close) بعد التقسيم مباشرة.
+        يرجع True إذا اجتاز الشرط (لم يتجاوز الحد)، و False إذا يجب الاستبعاد.
+        """
+        after_split = df[df.index.date >= split_date]
+        if after_split.empty or len(after_split) < 2:
+            # لا توجد بيانات كافية بعد التقسيم للحكم -- لا نستبعد بالغلط
+            return True
+
+        first_close = float(after_split["Close"].iloc[0])
+        if first_close <= 0:
+            return True
+
+        highest_after = float(after_split["High"].max())
+        rise_pct = (highest_after - first_close) / first_close * 100
+
+        return rise_pct <= max_rise_pct
+
+    # ----------------------------------------------------------------
     def _process_ticker(
         self, ticker: str, params: ScreenerParams, df=None, reverse_split=None
     ) -> Optional[StockResult]:
@@ -181,6 +206,12 @@ class Screener:
 
         avg_dollar_volume = float((df["Close"] * df["Volume"]).tail(20).mean())
         if avg_dollar_volume < params.min_dollar_volume:
+            return None
+
+        # -------- شرط جديد: ما صعد أول التقسيم أكثر من X% --------
+        if not self._check_post_split_rise(
+            df, reverse_split.split_date, params.max_post_split_rise_pct
+        ):
             return None
 
         # -------- Conditions 5-8: real support --------
