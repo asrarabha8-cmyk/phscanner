@@ -5,12 +5,12 @@ Main orchestrator. This is the only layer that knows about both the
 data_sources and analysis layers and wires them together; neither of
 those layers knows about the other (Clean Architecture).
 
-ترتيب المراحل مُحسَن لتقليل استهلاك الطلبات على مصادر البيانات المقيّدة:
+ترتيب المراحل:
 1. الترشيح الأولي بالسعر/القيمة السوقية (NASDAQ Screener، مجاني وسريع)
-2. فحص Reverse Split (Twelve Data) -- يقلل العدد بشكل كبير قبل التحليل
-3. جلب السعر التاريخي (Twelve Data) -- فقط على الأسهم اللي عندها Reverse Split فعلاً
+2. جلب السعر التاريخي (Twelve Data) -- مرة واحدة فقط لكل الأسهم الناجية
+3. اكتشاف Reverse Split محليًا من بيانات السعر/الفوليوم نفسها (بدون طلب خارجي)
 4. باقي التحليل (Support, Volume, News, Short Interest، وفلتر الصعود بعد
-   التقسيم) على العدد الصغير النهائي
+   التقسيم)
 """
 
 import logging
@@ -23,18 +23,17 @@ from core.models import ScreenerParams, StockResult
 from data_sources.base import (
     NewsSource,
     PriceDataSource,
-    ReverseSplitSource,
     ShortInterestSource,
     UniverseSource,
 )
 from data_sources.news_source import YFinanceKeywordNewsSource
 from data_sources.price_source import TwelveDataPriceSource
-from data_sources.reverse_split_source import TwelveDataReverseSplitSource
 from data_sources.short_interest_source import CompositeShortInterestSource
 from data_sources.universe_source import NasdaqTraderUniverseSource
 from data_sources.prefilter_source import get_prefiltered_tickers
 from analysis.support_detector import SupportDetector
 from analysis.volume_analyzer import VolumeAnalyzer
+from analysis.reverse_split_detector import detect_reverse_split
 from analysis.scorer import PhoenixScorer
 
 logger = logging.getLogger(__name__)
@@ -47,14 +46,12 @@ class Screener:
         self,
         price_source: Optional[PriceDataSource] = None,
         universe_source: Optional[UniverseSource] = None,
-        reverse_split_source: Optional[ReverseSplitSource] = None,
         news_source: Optional[NewsSource] = None,
         short_interest_source: Optional[ShortInterestSource] = None,
         max_workers: int = 8,
     ):
         self.price_source = price_source or TwelveDataPriceSource()
         self.universe_source = universe_source or NasdaqTraderUniverseSource()
-        self.reverse_split_source = reverse_split_source or TwelveDataReverseSplitSource()
         self.news_source = news_source or YFinanceKeywordNewsSource()
         self.short_interest_source = short_interest_source or CompositeShortInterestSource()
         self.max_workers = max_workers
@@ -78,76 +75,28 @@ class Screener:
             max_market_cap=params.max_market_cap,
         )
 
-        stage1_total = len(tickers)
+        total = len(tickers)
         if progress_callback:
-            progress_callback(0, stage1_total, f"{stage1_total} tickers passed pre-filter")
+            progress_callback(0, total, f"{total} tickers passed pre-filter")
 
-        # -------- المرحلة 2: فحص Reverse Split (Twelve Data) قبل أي شيء ثقيل --------
-        if progress_callback:
-            progress_callback(0, stage1_total, "Checking Reverse Splits...")
-
-        reverse_split_map = {}
-        done_rs = 0
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            future_map = {
-                executor.submit(
-                    self.reverse_split_source.get_recent_reverse_splits,
-                    ticker,
-                    params.reverse_split_lookback_days,
-                    date.today(),
-                ): ticker
-                for ticker in tickers
-            }
-            for future in as_completed(future_map):
-                ticker = future_map[future]
-                done_rs += 1
-                try:
-                    rs_info = future.result()
-                    if rs_info is not None:
-                        reverse_split_map[ticker] = rs_info
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning("Unexpected error checking reverse split for %s: %s", ticker, exc)
-
-                if progress_callback and done_rs % 10 == 0:
-                    progress_callback(done_rs, stage1_total, f"Reverse split check: {ticker}")
-
-        surviving_tickers = list(reverse_split_map.keys())
-        logger.warning(
-            "المرحلة 2: %d من أصل %d سهم عندهم Reverse Split ضمن %d يوم",
-            len(surviving_tickers),
-            stage1_total,
-            params.reverse_split_lookback_days,
-        )
-
-        total = len(surviving_tickers)
-        if progress_callback:
-            progress_callback(0, total, f"{total} tickers have a recent reverse split")
-
-        if total == 0:
-            return []
-
-        # -------- المرحلة 3: جلب السعر التاريخي (Twelve Data) فقط على الناجين --------
+        # -------- المرحلة 2: جلب السعر التاريخي (Twelve Data) --------
         if progress_callback:
             progress_callback(0, total, "Fetching price data...")
 
         price_data = self.price_source.get_history_batch(
-            surviving_tickers, period=PRICE_HISTORY_PERIOD, batch_size=100
+            tickers, period=PRICE_HISTORY_PERIOD, batch_size=100
         )
 
-        # -------- المرحلة 4: باقي التحليل --------
+        # -------- المرحلة 3+4: اكتشاف Reverse Split محليًا + باقي التحليل --------
         results: List[StockResult] = []
         done_count = 0
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             future_map = {
                 executor.submit(
-                    self._process_ticker,
-                    ticker,
-                    params,
-                    price_data.get(ticker),
-                    reverse_split_map[ticker],
+                    self._process_ticker, ticker, params, price_data.get(ticker)
                 ): ticker
-                for ticker in surviving_tickers
+                for ticker in tickers
             }
 
             for future in as_completed(future_map):
@@ -170,15 +119,8 @@ class Screener:
     def _check_post_split_rise(
         self, df, split_date: date, max_rise_pct: float
     ) -> bool:
-        """
-        يتحقق أن السهم لم يصعد أكثر من max_rise_pct% مباشرة بعد تاريخ
-        الـ Reverse Split. يقارن أعلى سعر (High) بعد التقسيم بسعر أول
-        إغلاق (Close) بعد التقسيم مباشرة.
-        يرجع True إذا اجتاز الشرط (لم يتجاوز الحد)، و False إذا يجب الاستبعاد.
-        """
         after_split = df[df.index.date >= split_date]
         if after_split.empty or len(after_split) < 2:
-            # لا توجد بيانات كافية بعد التقسيم للحكم -- لا نستبعد بالغلط
             return True
 
         first_close = float(after_split["Close"].iloc[0])
@@ -192,12 +134,9 @@ class Screener:
 
     # ----------------------------------------------------------------
     def _process_ticker(
-        self, ticker: str, params: ScreenerParams, df=None, reverse_split=None
+        self, ticker: str, params: ScreenerParams, df=None
     ) -> Optional[StockResult]:
-        # df و reverse_split يوصلون جاهزين من المراحل السابقة
         if df is None or df.empty:
-            return None
-        if reverse_split is None:
             return None
 
         last_price = float(df["Close"].iloc[-1])
@@ -208,7 +147,14 @@ class Screener:
         if avg_dollar_volume < params.min_dollar_volume:
             return None
 
-        # -------- شرط جديد: ما صعد أول التقسيم أكثر من X% --------
+        # -------- Condition 1: Reverse Split (اكتشاف محلي) --------
+        reverse_split = detect_reverse_split(
+            df, params.reverse_split_lookback_days, date.today()
+        )
+        if reverse_split is None:
+            return None
+
+        # -------- شرط: ما صعد أول التقسيم أكثر من X% --------
         if not self._check_post_split_rise(
             df, reverse_split.split_date, params.max_post_split_rise_pct
         ):
