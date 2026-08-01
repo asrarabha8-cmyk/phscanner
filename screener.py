@@ -67,6 +67,7 @@ class Screener:
             max_price=params.max_price,
             min_dollar_volume=params.min_dollar_volume,
             min_price=params.min_price,
+            max_market_cap=params.max_market_cap,
         )
 
         total = len(tickers)
