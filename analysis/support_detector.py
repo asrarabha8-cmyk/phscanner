@@ -81,7 +81,7 @@ class SupportDetector:
         return clusters
 
     # ------------------------------------------------------------------
-    # الخطوة 3: التحقق من عدم كسر منطقة معيّنة
+    # الخطوة 3: التحقق من عدم كسر منطقة معينة
     # ------------------------------------------------------------------
     def _is_zone_intact(
         self, df: pd.DataFrame, zone_low: float, first_touch_idx: int
@@ -138,6 +138,7 @@ class SupportDetector:
                     touch_dates=[c.dt for c in cluster],
                     base_start_date=first_touch.dt,
                     base_days=base_days,
+                    first_touch_low=first_touch.price,
                     broken=not intact,
                 )
             )
