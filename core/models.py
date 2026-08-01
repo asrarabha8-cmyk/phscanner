@@ -15,6 +15,7 @@ class ScreenerParams:
     """كل المعايير القابلة للتحكم من واجهة المستخدم."""
 
     reverse_split_lookback_days: int = 90
+    max_post_split_rise_pct: float = 20.0  # الحد الأقصى للصعود بعد التقسيم مباشرة
     min_short_float_pct: Optional[float] = 15.0
     min_touches: int = 3
     min_base_days: int = 20
@@ -46,6 +47,7 @@ class SupportZone:
     touch_dates: List[date]
     base_start_date: date
     base_days: int
+    first_touch_low: float  # ذيل شمعة القاع الأول -- يُستخدم كوقف خسارة
     broken: bool  # True إذا كان هناك إغلاق يومي تحت الدعم خلال فترة القاعدة
 
 
@@ -107,6 +109,7 @@ class StockResult:
             "Ticker": self.ticker,
             "Price": round(self.price, 3),
             "Support Zone": f"{self.support_zone.zone_low:.2f} - {self.support_zone.zone_high:.2f}",
+            "Stop Loss": round(self.support_zone.first_touch_low, 3),
             "Touches": self.support_zone.touches,
             "Base Days": self.support_zone.base_days,
             "Base Width %": round(
