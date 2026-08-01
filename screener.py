@@ -4,6 +4,12 @@ screener.py
 Main orchestrator. This is the only layer that knows about both the
 data_sources and analysis layers and wires them together; neither of
 those layers knows about the other (Clean Architecture).
+
+ترتيب المراحل مُحسَّن لتقليل استهلاك الطلبات على مصادر البيانات المقيّدة:
+1. الترشيح الأولي بالسعر/القيمة السوقية (NASDAQ Screener، مجاني وسريع)
+2. فحص Reverse Split (Finnhub) -- يقلل العدد بشكل كبير قبل الخطوة الأثقل
+3. جلب السعر التاريخي (Twelve Data) -- فقط على الأسهم اللي عندها Reverse Split فعلاً
+4. باقي التحليل (Support, Volume, News, Short Interest) على العدد الصغير النهائي
 """
 
 import logging
@@ -57,10 +63,11 @@ class Screener:
         params: ScreenerParams,
         progress_callback: Optional[ProgressCallback] = None,
     ) -> List[StockResult]:
+        # -------- المرحلة 1: الترشيح الأولي بالسعر/القيمة السوقية --------
         tickers = self.universe_source.get_tickers(TARGET_EXCHANGES)
 
         if progress_callback:
-            progress_callback(0, len(tickers), "Pre-filtering by price/volume...")
+            progress_callback(0, len(tickers), "Pre-filtering by price/market cap...")
 
         tickers = get_prefiltered_tickers(
             tickers,
@@ -70,27 +77,76 @@ class Screener:
             max_market_cap=params.max_market_cap,
         )
 
-        total = len(tickers)
+        stage1_total = len(tickers)
         if progress_callback:
-            progress_callback(0, total, f"{total} tickers passed pre-filter")
+            progress_callback(0, stage1_total, f"{stage1_total} tickers passed pre-filter")
 
-        # -------- جلب بيانات الأسعار (Twelve Data، طلب لكل سهم مع throttling) --------
+        # -------- المرحلة 2: فحص Reverse Split (Finnhub) قبل أي شيء ثقيل --------
+        if progress_callback:
+            progress_callback(0, stage1_total, "Checking Reverse Splits...")
+
+        reverse_split_map = {}
+        done_rs = 0
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            future_map = {
+                executor.submit(
+                    self.reverse_split_source.get_recent_reverse_splits,
+                    ticker,
+                    params.reverse_split_lookback_days,
+                    date.today(),
+                ): ticker
+                for ticker in tickers
+            }
+            for future in as_completed(future_map):
+                ticker = future_map[future]
+                done_rs += 1
+                try:
+                    rs_info = future.result()
+                    if rs_info is not None:
+                        reverse_split_map[ticker] = rs_info
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Unexpected error checking reverse split for %s: %s", ticker, exc)
+
+                if progress_callback and done_rs % 10 == 0:
+                    progress_callback(done_rs, stage1_total, f"Reverse split check: {ticker}")
+
+        surviving_tickers = list(reverse_split_map.keys())
+        logger.warning(
+            "المرحلة 2: %d من أصل %d سهم عندهم Reverse Split ضمن %d يوم",
+            len(surviving_tickers),
+            stage1_total,
+            params.reverse_split_lookback_days,
+        )
+
+        total = len(surviving_tickers)
+        if progress_callback:
+            progress_callback(0, total, f"{total} tickers have a recent reverse split")
+
+        if total == 0:
+            return []
+
+        # -------- المرحلة 3: جلب السعر التاريخي (Twelve Data) فقط على الناجين --------
         if progress_callback:
             progress_callback(0, total, "Fetching price data...")
 
         price_data = self.price_source.get_history_batch(
-            tickers, period=PRICE_HISTORY_PERIOD, batch_size=100
+            surviving_tickers, period=PRICE_HISTORY_PERIOD, batch_size=100
         )
 
+        # -------- المرحلة 4: باقي التحليل --------
         results: List[StockResult] = []
         done_count = 0
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             future_map = {
                 executor.submit(
-                    self._process_ticker, ticker, params, price_data.get(ticker)
+                    self._process_ticker,
+                    ticker,
+                    params,
+                    price_data.get(ticker),
+                    reverse_split_map[ticker],
                 ): ticker
-                for ticker in tickers
+                for ticker in surviving_tickers
             }
 
             for future in as_completed(future_map):
@@ -111,10 +167,12 @@ class Screener:
 
     # ----------------------------------------------------------------
     def _process_ticker(
-        self, ticker: str, params: ScreenerParams, df=None
+        self, ticker: str, params: ScreenerParams, df=None, reverse_split=None
     ) -> Optional[StockResult]:
-        # df يوصل جاهز من get_history_batch بدل ما يُطلب من الشبكة هنا
+        # df و reverse_split يوصلون جاهزين من المراحل السابقة
         if df is None or df.empty:
+            return None
+        if reverse_split is None:
             return None
 
         last_price = float(df["Close"].iloc[-1])
@@ -123,13 +181,6 @@ class Screener:
 
         avg_dollar_volume = float((df["Close"] * df["Volume"]).tail(20).mean())
         if avg_dollar_volume < params.min_dollar_volume:
-            return None
-
-        # -------- Condition 1: Reverse Split --------
-        reverse_split = self.reverse_split_source.get_recent_reverse_splits(
-            ticker, params.reverse_split_lookback_days, date.today()
-        )
-        if reverse_split is None:
             return None
 
         # -------- Conditions 5-8: real support --------
