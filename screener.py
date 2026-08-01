@@ -21,7 +21,7 @@ from data_sources.base import (
     UniverseSource,
 )
 from data_sources.news_source import YFinanceKeywordNewsSource
-from data_sources.price_source import FinnhubPriceSource
+from data_sources.price_source import TwelveDataPriceSource
 from data_sources.reverse_split_source import FinnhubReverseSplitSource
 from data_sources.short_interest_source import CompositeShortInterestSource
 from data_sources.universe_source import NasdaqTraderUniverseSource
@@ -45,7 +45,7 @@ class Screener:
         short_interest_source: Optional[ShortInterestSource] = None,
         max_workers: int = 8,
     ):
-        self.price_source = price_source or FinnhubPriceSource()
+        self.price_source = price_source or TwelveDataPriceSource()
         self.universe_source = universe_source or NasdaqTraderUniverseSource()
         self.reverse_split_source = reverse_split_source or FinnhubReverseSplitSource()
         self.news_source = news_source or YFinanceKeywordNewsSource()
@@ -67,16 +67,15 @@ class Screener:
             max_price=params.max_price,
             min_dollar_volume=params.min_dollar_volume,
             min_price=params.min_price,
-             )
-
+        )
 
         total = len(tickers)
         if progress_callback:
             progress_callback(0, total, f"{total} tickers passed pre-filter")
 
-        # -------- المرحلة الجديدة: جلب كل بيانات الأسعار دفعة وحدة --------
+        # -------- جلب بيانات الأسعار (Twelve Data، طلب لكل سهم مع throttling) --------
         if progress_callback:
-            progress_callback(0, total, "Fetching price data in batches...")
+            progress_callback(0, total, "Fetching price data...")
 
         price_data = self.price_source.get_history_batch(
             tickers, period=PRICE_HISTORY_PERIOD, batch_size=100
@@ -113,7 +112,7 @@ class Screener:
     def _process_ticker(
         self, ticker: str, params: ScreenerParams, df=None
     ) -> Optional[StockResult]:
-        # df يوصل جاهز من الـ batch fetch بدل ما يُطلب من الشبكة هنا
+        # df يوصل جاهز من get_history_batch بدل ما يُطلب من الشبكة هنا
         if df is None or df.empty:
             return None
 
