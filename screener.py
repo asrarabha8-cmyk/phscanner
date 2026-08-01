@@ -5,9 +5,9 @@ Main orchestrator. This is the only layer that knows about both the
 data_sources and analysis layers and wires them together; neither of
 those layers knows about the other (Clean Architecture).
 
-ترتيب المراحل مُحسَّن لتقليل استهلاك الطلبات على مصادر البيانات المقيّدة:
+ترتيب المراحل مُحسَن لتقليل استهلاك الطلبات على مصادر البيانات المقيّدة:
 1. الترشيح الأولي بالسعر/القيمة السوقية (NASDAQ Screener، مجاني وسريع)
-2. فحص Reverse Split (Finnhub) -- يقلل العدد بشكل كبير قبل الخطوة الأثقل
+2. فحص Reverse Split (Twelve Data) -- يقلل العدد بشكل كبير قبل التحليل
 3. جلب السعر التاريخي (Twelve Data) -- فقط على الأسهم اللي عندها Reverse Split فعلاً
 4. باقي التحليل (Support, Volume, News, Short Interest، وفلتر الصعود بعد
    التقسيم) على العدد الصغير النهائي
@@ -29,7 +29,7 @@ from data_sources.base import (
 )
 from data_sources.news_source import YFinanceKeywordNewsSource
 from data_sources.price_source import TwelveDataPriceSource
-from data_sources.reverse_split_source import FinnhubReverseSplitSource
+from data_sources.reverse_split_source import TwelveDataReverseSplitSource
 from data_sources.short_interest_source import CompositeShortInterestSource
 from data_sources.universe_source import NasdaqTraderUniverseSource
 from data_sources.prefilter_source import get_prefiltered_tickers
@@ -54,7 +54,7 @@ class Screener:
     ):
         self.price_source = price_source or TwelveDataPriceSource()
         self.universe_source = universe_source or NasdaqTraderUniverseSource()
-        self.reverse_split_source = reverse_split_source or FinnhubReverseSplitSource()
+        self.reverse_split_source = reverse_split_source or TwelveDataReverseSplitSource()
         self.news_source = news_source or YFinanceKeywordNewsSource()
         self.short_interest_source = short_interest_source or CompositeShortInterestSource()
         self.max_workers = max_workers
@@ -82,7 +82,7 @@ class Screener:
         if progress_callback:
             progress_callback(0, stage1_total, f"{stage1_total} tickers passed pre-filter")
 
-        # -------- المرحلة 2: فحص Reverse Split (Finnhub) قبل أي شيء ثقيل --------
+        # -------- المرحلة 2: فحص Reverse Split (Twelve Data) قبل أي شيء ثقيل --------
         if progress_callback:
             progress_callback(0, stage1_total, "Checking Reverse Splits...")
 
