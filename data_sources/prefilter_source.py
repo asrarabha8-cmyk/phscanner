@@ -1,13 +1,16 @@
 """
 data_sources/prefilter_source.py
 -----------------------------------
-ترشيح أولي سريع لكل الأسهم بالسعر فقط، بطلب واحد، قبل ما نروح لمصدر
-البيانات العميق (Twelve Data) للتحليل الكامل.
+ترشيح أولي سريع لكل الأسهم بالسعر والقيمة السوقية، بطلب واحد، قبل ما
+نروح لمصدر البيانات العميق (Twelve Data) للتحليل الكامل.
 
 المصدر: NASDAQ Screener API (عام، بدون مفتاح).
-ملاحظة: NASDAQ Screener لا يرجع عمود الفوليوم بشكل موثوق مع هذا الشكل
-من الطلب، لذلك نكتفي هنا بفلترة السعر فقط. فلتر الفوليوم (min_dollar_volume)
-يبقى مطبّقًا لاحقًا بمرحلة التحليل العميق في screener.py، فلا نخسر الدقة.
+ملاحظات:
+1. نطبّع (normalize) رموز الأسهم من الطرفين (upper + strip) قبل المقارنة.
+2. نستخدم فلتر القيمة السوقية (Market Cap) بدل الفوليوم -- لأن NASDAQ
+   Screener لا يرجع عمود الفوليوم بشكل موثوق، لكنه يرجع القيمة السوقية
+   دائمًا. هذا أيضًا منطقي لهدف المشروع: أسهم الـ Reverse Split غالبًا
+   شركات صغيرة (micro-cap).
 """
 
 import logging
@@ -35,6 +38,7 @@ def get_prefiltered_tickers(
     max_price: float,
     min_dollar_volume: float,
     min_price: float = 1.0,
+    max_market_cap: float = 300_000_000,
     limit: int = 8000,
 ) -> List[str]:
     tickers_set: Set[str] = {t.strip().upper() for t in all_tickers}
@@ -66,6 +70,7 @@ def get_prefiltered_tickers(
         if symbol not in tickers_set:
             continue
         matched_symbols += 1
+
         try:
             price = float(row.get("lastsale", "0").replace("$", "").replace(",", ""))
         except (ValueError, AttributeError):
@@ -73,6 +78,15 @@ def get_prefiltered_tickers(
 
         if price < min_price or price > max_price:
             continue
+
+        try:
+            market_cap = float(row.get("marketCap", "0").replace(",", "") or "0")
+        except (ValueError, AttributeError):
+            market_cap = 0
+
+        if market_cap <= 0 or market_cap > max_market_cap:
+            continue
+
         passed.append(symbol)
 
     logger.warning(
@@ -83,13 +97,13 @@ def get_prefiltered_tickers(
 
     if not passed:
         logger.warning(
-            "الترشيح الأولي: 0 اجتاز فلتر السعر رغم %d تطابق -- استخدام القائمة الكاملة",
+            "الترشيح الأولي: 0 اجتاز فلتر السعر/القيمة السوقية رغم %d تطابق -- استخدام القائمة الكاملة",
             matched_symbols,
         )
         return all_tickers
 
     logger.warning(
-        "الترشيح الأولي: %d من أصل %d سهم اجتازوا فلتر السعر",
+        "الترشيح الأولي: %d من أصل %d سهم اجتازوا فلتر السعر/القيمة السوقية",
         len(passed),
         len(all_tickers),
     )
