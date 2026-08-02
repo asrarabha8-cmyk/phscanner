@@ -14,8 +14,7 @@ import logging
 
 import pandas as pd
 import streamlit as st
-import test_polygon
-test_polygon.run_test()
+
 
 
 from config import (
