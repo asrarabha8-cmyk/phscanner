@@ -1,70 +1,96 @@
 """
-analysis/reverse_split_detector.py
--------------------------------------
-يكتشف Reverse Split محليًا من بيانات السعر والفوليوم نفسها (اللي أصلاً
-عندنا من Twelve Data)، بدون أي طلب لمصدر بيانات خارجي منفصل.
+data_sources/split_calendar_source.py
+----------------------------------------
+يجلب تقويم Reverse Splits مباشرة من NASDAQ (endpoint: /api/calendar/splits)
+لكل يوم ضمن فترة البحث، بدل ما نفحص كل سهم لحاله. هذا يقلل العدد النهائي
+من مئات الأسهم إلى فقط الأسهم اللي فعلاً عملت Reverse Split بالفترة --
+عادة عدد صغير جدًا (عشرات كحد أقصى).
 
-الفكرة: عند حدوث Reverse Split بنسبة N-for-1 (مثال: 1-for-10)، يصير:
-  - قفزة مفاجئة في السعر بين إغلاق يوم وافتتاح اليوم التالي بمعامل قريب من N
-  - انخفاض متزامن في الفوليوم بنفس المعامل تقريبًا (لأن عدد الأسهم
-    المتداولة يتقلّص بنفس النسبة)
-هذا النمط المزدوج (سعر × فوليوم معًا) يميّز Reverse Split عن أي قفزة
-سعرية عادية ناتجة عن خبر أو تقلب سوق طبيعي.
+ملاحظة: شكل استجابة NASDAQ غير مؤكد 100% بدون اختبار فعلي، لذلك الكود
+يطبع تشخيصًا (أول سجل خام) لأول يوم ناجح، لنتأكد من أسماء الحقول الصحيحة.
 """
 
-from datetime import date
-from typing import Optional
+import logging
+from datetime import date, timedelta
+from typing import Dict, Optional
 
-import pandas as pd
+import requests
 
 from core.models import ReverseSplitInfo
 
-# النسب الشائعة لل Reverse Split (N-for-1)
-_COMMON_RATIOS = [2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50]
-_PRICE_TOLERANCE = 0.12          # هامش تسامح 12% حول النسبة المتوقعة
-_MAX_VOLUME_RATIO_MARGIN = 0.4   # هامش سماح فوق الانخفاض المتوقع بالفوليوم
+logger = logging.getLogger(__name__)
+
+NASDAQ_SPLITS_CALENDAR_URL = "https://api.nasdaq.com/api/calendar/splits"
+
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+    ),
+    "Accept": "application/json",
+    "Referer": "https://www.nasdaq.com/",
+    "Origin": "https://www.nasdaq.com",
+}
+
+_logged_sample = False
 
 
-def detect_reverse_split(
-    df: pd.DataFrame, lookback_days: int, as_of: date
-) -> Optional[ReverseSplitInfo]:
-    if df is None or len(df) < 2:
-        return None
+def get_recent_reverse_splits_calendar(
+    lookback_days: int, as_of: date
+) -> Dict[str, ReverseSplitInfo]:
+    global _logged_sample
+    results: Dict[str, ReverseSplitInfo] = {}
 
-    cutoff = pd.Timestamp(as_of) - pd.Timedelta(days=lookback_days)
-    closes = df["Close"].values
-    opens = df["Open"].values
-    volumes = df["Volume"].values
-    dates = df.index
-
-    best_match: Optional[ReverseSplitInfo] = None
-
-    for i in range(1, len(df)):
-        dt = dates[i]
-        if dt < cutoff:
+    for i in range(lookback_days + 1):
+        day = as_of - timedelta(days=i)
+        try:
+            resp = requests.get(
+                NASDAQ_SPLITS_CALENDAR_URL,
+                headers=_HEADERS,
+                params={"date": day.isoformat()},
+                timeout=15,
+            )
+            resp.raise_for_status()
+            payload = resp.json()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("فشل جلب تقويم splits لتاريخ %s: %s", day, exc)
             continue
 
-        prev_close = closes[i - 1]
-        today_open = opens[i]
-        if prev_close <= 0 or today_open <= 0:
-            continue
+        rows = (
+            payload.get("data", {}).get("calendar", {}).get("rows")
+            if payload.get("data")
+            else None
+        ) or []
 
-        price_ratio = today_open / prev_close
-        if price_ratio <= 1.3:
-            continue  # مو قفزة كبيرة كفاية لتكون Reverse Split
+        if rows and not _logged_sample:
+            logger.warning("تقويم Splits: عينة أول سجل = %s", rows[0])
+            _logged_sample = True
 
-        prev_volume = volumes[i - 1]
-        today_volume = volumes[i]
+        for row in rows:
+            symbol = (row.get("symbol") or "").strip().upper()
+            ratio_str = row.get("ratio") or ""
+            if not symbol or ":" not in ratio_str:
+                continue
+            try:
+                parts = [p.strip() for p in ratio_str.split(":")]
+                new_shares = float(parts[0])
+                old_shares = float(parts[1])
+            except (ValueError, IndexError):
+                continue
 
-        for n in _COMMON_RATIOS:
-            expected = float(n)
-            if abs(price_ratio - expected) / expected <= _PRICE_TOLERANCE:
-                if prev_volume > 0:
-                    volume_ratio = today_volume / prev_volume
-                    if volume_ratio <= (1 / expected) * (1 + _MAX_VOLUME_RATIO_MARGIN):
-                        best_match = ReverseSplitInfo(
-                            split_date=dt.date(), ratio=1.0 / expected
-                        )
-                break
+            if old_shares <= 0 or new_shares <= 0:
+                continue
 
-    return best_match
+            # Reverse Split: old_shares > new_shares (مثال 1:10 -> 1 جديد مقابل 10 قديم)
+            if old_shares <= new_shares:
+                continue  # هذا split عادي (تجزيء)، مو reverse
+
+            ratio = new_shares / old_shares
+            results[symbol] = ReverseSplitInfo(split_date=day, ratio=ratio)
+
+    logger.warning(
+        "تقويم Splits: %d سهم عندهم Reverse Split خلال %d يوم",
+        len(results),
+        lookback_days,
+    )
+    return results
