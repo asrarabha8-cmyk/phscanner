@@ -16,8 +16,8 @@ class ScreenerParams:
 
     reverse_split_lookback_days: int = 90
     max_post_split_rise_pct: float = 20.0  # الحد الأقصى للصعود بعد التقسيم مباشرة
-    min_price_drop_pct: float = 40.0       # نسبة الهبوط المطلوبة من القمة
-    decline_window_days: int = 30          # نافذة رصد القمة قبل الهبوط
+    min_price_drop_pct: float = 40.0
+    decline_window_days: int = 30
     min_short_float_pct: Optional[float] = 15.0
     min_touches: int = 2
     min_base_days: int = 20
@@ -134,4 +134,20 @@ class StockResult:
             "RVOL": round(self.volume_profile.relative_volume, 2),
             "Reverse Split Date": self.reverse_split.split_date.isoformat(),
             "Phoenix Score": round(self.score.total, 1),
+        }
+
+
+@dataclass
+class NearMissResult:
+    """سهم فشل بشرط واحد بفارق بسيط -- يُعرض بجدول منفصل للمراجعة اليدوية."""
+
+    ticker: str
+    price: float
+    gap_description: str  # شرح مختصر لسبب القرب من التأهل
+
+    def to_row(self) -> dict:
+        return {
+            "Ticker": self.ticker,
+            "Price": round(self.price, 3),
+            "Why it's close": self.gap_description,
         }
