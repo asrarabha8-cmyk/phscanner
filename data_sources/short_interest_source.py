@@ -5,14 +5,12 @@ data_sources/short_interest_source.py
 
 Short Interest: من endpoint /stocks/v1/short-interest (يرجع عدد الأسهم
 المكشوفة، يُحسب منها Short Float % بالقسمة على عدد الأسهم القائمة).
-Short Float % محسوب محليًا لأن Polygon يرجع عدد أسهم خام لا نسبة جاهزة.
 
 Borrow Fee: لا يزال يُجلب من iBorrowDesk (مجاني) لأن Polygon Stocks
 Starter لا يشمل بيانات borrow fee.
 """
 
 import logging
-from datetime import date, timedelta
 
 import requests
 import streamlit as st
@@ -24,6 +22,8 @@ from data_sources.base import ShortInterestSource
 logger = logging.getLogger(__name__)
 
 POLYGON_BASE_URL = "https://api.polygon.io"
+
+_logged_sample = False
 
 
 class CompositeShortInterestSource(ShortInterestSource):
@@ -42,22 +42,36 @@ class CompositeShortInterestSource(ShortInterestSource):
         )
 
     def _get_short_float_pct(self, ticker: str):
+        global _logged_sample
         try:
-            # أحدث تقرير short interest (مرتين بالشهر)
             resp = requests.get(
                 f"{POLYGON_BASE_URL}/stocks/v1/short-interest",
-                params={"ticker": ticker, "limit": 1, "sort": "settlement_date.desc", "apiKey": self.api_key},
+                params={
+                    "ticker": ticker,
+                    "limit": 1,
+                    "sort": "settlement_date.desc",
+                    "apiKey": self.api_key,
+                },
                 timeout=15,
             )
+            if not _logged_sample:
+                logger.warning(
+                    "تشخيص Short Interest: status=%d لـ %s، رد أول 300 حرف: %s",
+                    resp.status_code,
+                    ticker,
+                    resp.text[:300],
+                )
+                _logged_sample = True
+
             resp.raise_for_status()
             results = resp.json().get("results") or []
             if not results:
                 return None
+
             short_shares = float(results[0].get("short_interest", 0))
             if short_shares <= 0:
                 return None
 
-            # عدد الأسهم القائمة (shares outstanding)
             resp2 = requests.get(
                 f"{POLYGON_BASE_URL}/v3/reference/tickers/{ticker}",
                 params={"apiKey": self.api_key},
