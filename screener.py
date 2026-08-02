@@ -5,11 +5,11 @@ Main orchestrator. This is the only layer that knows about both the
 data_sources and analysis layers and wires them together; neither of
 those layers knows about the other (Clean Architecture).
 
-ترتيب المراحل:
-1. جلب تقويم Reverse Splits من NASDAQ مباشرة (طلب واحد لكل يوم ضمن
-   فترة البحث) -- يقلل العدد لعشرات الأسهم فقط، بدل فحص آلاف الأسهم
-2. الترشيح بالسعر/القيمة السوقية على هالقائمة الصغيرة فقط
-3. جلب السعر التاريخي (Twelve Data) على العدد الصغير النهائي
+ترتيب المراحل (بعد الاشتراك بـ Polygon Stocks Starter -- طلبات غير محدودة):
+1. الترشيح الأولي بالسعر/القيمة السوقية (NASDAQ Screener، مجاني وسريع)
+   -- يقلل العدد من آلاف الأسهم لبضع مئات قبل أي طلب لـ Polygon
+2. فحص Reverse Split (Polygon) على القائمة المصغّرة -- بالتوازي، بدون حدود
+3. جلب السعر التاريخي (Polygon) فقط على الأسهم اللي عندها Reverse Split
 4. باقي التحليل (Support, Volume, News, Short Interest، وفلتر الصعود
    بعد التقسيم)
 """
@@ -19,13 +19,21 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from typing import Callable, List, Optional
 
-from config import PRICE_HISTORY_PERIOD, RVOL_AVERAGE_WINDOW
+from config import PRICE_HISTORY_PERIOD, RVOL_AVERAGE_WINDOW, TARGET_EXCHANGES
 from core.models import ScreenerParams, StockResult
-from data_sources.base import NewsSource, PriceDataSource, ShortInterestSource
+from data_sources.base import (
+    NewsSource,
+    PriceDataSource,
+    ReverseSplitSource,
+    ShortInterestSource,
+    UniverseSource,
+)
 from data_sources.news_source import YFinanceKeywordNewsSource
-from data_sources.price_source import TwelveDataPriceSource
+from data_sources.price_source import PolygonPriceSource
+from data_sources.reverse_split_source import PolygonReverseSplitSource
 from data_sources.short_interest_source import CompositeShortInterestSource
-from data_sources.split_calendar_source import get_recent_reverse_splits_calendar
+from data_sources.universe_source import NasdaqTraderUniverseSource
+from data_sources.prefilter_source import get_prefiltered_tickers
 from analysis.support_detector import SupportDetector
 from analysis.volume_analyzer import VolumeAnalyzer
 from analysis.scorer import PhoenixScorer
@@ -39,11 +47,15 @@ class Screener:
     def __init__(
         self,
         price_source: Optional[PriceDataSource] = None,
+        universe_source: Optional[UniverseSource] = None,
+        reverse_split_source: Optional[ReverseSplitSource] = None,
         news_source: Optional[NewsSource] = None,
         short_interest_source: Optional[ShortInterestSource] = None,
-        max_workers: int = 8,
+        max_workers: int = 15,
     ):
-        self.price_source = price_source or TwelveDataPriceSource()
+        self.price_source = price_source or PolygonPriceSource()
+        self.universe_source = universe_source or NasdaqTraderUniverseSource()
+        self.reverse_split_source = reverse_split_source or PolygonReverseSplitSource()
         self.news_source = news_source or YFinanceKeywordNewsSource()
         self.short_interest_source = short_interest_source or CompositeShortInterestSource()
         self.max_workers = max_workers
@@ -53,33 +65,77 @@ class Screener:
         params: ScreenerParams,
         progress_callback: Optional[ProgressCallback] = None,
     ) -> List[StockResult]:
-        # -------- المرحلة 1: تقويم Reverse Splits من NASDAQ --------
-        if progress_callback:
-            progress_callback(0, 1, "Fetching reverse split calendar from NASDAQ...")
+        # -------- المرحلة 1: الترشيح الأولي بالسعر/القيمة السوقية --------
+        tickers = self.universe_source.get_tickers(TARGET_EXCHANGES)
 
-        reverse_split_map = get_recent_reverse_splits_calendar(
-            params.reverse_split_lookback_days, date.today()
+        if progress_callback:
+            progress_callback(0, len(tickers), "Pre-filtering by price/market cap...")
+
+        tickers = get_prefiltered_tickers(
+            tickers,
+            max_price=params.max_price,
+            min_dollar_volume=params.min_dollar_volume,
+            min_price=params.min_price,
+            max_market_cap=params.max_market_cap,
         )
 
-        tickers = list(reverse_split_map.keys())
-        total = len(tickers)
-        logger.warning("المرحلة 1: %d سهم من تقويم NASDAQ للـ Reverse Split", total)
+        stage1_total = len(tickers)
+        if progress_callback:
+            progress_callback(0, stage1_total, f"{stage1_total} tickers passed pre-filter")
 
+        # -------- المرحلة 2: فحص Reverse Split (Polygon) بالتوازي --------
+        if progress_callback:
+            progress_callback(0, stage1_total, "Checking Reverse Splits...")
+
+        reverse_split_map = {}
+        done_rs = 0
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            future_map = {
+                executor.submit(
+                    self.reverse_split_source.get_recent_reverse_splits,
+                    ticker,
+                    params.reverse_split_lookback_days,
+                    date.today(),
+                ): ticker
+                for ticker in tickers
+            }
+            for future in as_completed(future_map):
+                ticker = future_map[future]
+                done_rs += 1
+                try:
+                    rs_info = future.result()
+                    if rs_info is not None:
+                        reverse_split_map[ticker] = rs_info
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Unexpected error checking reverse split for %s: %s", ticker, exc)
+
+                if progress_callback and done_rs % 10 == 0:
+                    progress_callback(done_rs, stage1_total, f"Reverse split check: {ticker}")
+
+        surviving_tickers = list(reverse_split_map.keys())
+        logger.warning(
+            "المرحلة 2: %d من أصل %d سهم عندهم Reverse Split ضمن %d يوم",
+            len(surviving_tickers),
+            stage1_total,
+            params.reverse_split_lookback_days,
+        )
+
+        total = len(surviving_tickers)
         if progress_callback:
             progress_callback(0, total, f"{total} tickers have a recent reverse split")
 
         if total == 0:
             return []
 
-        # -------- المرحلة 2: جلب السعر التاريخي (Twelve Data) --------
+        # -------- المرحلة 3: جلب السعر التاريخي (Polygon) --------
         if progress_callback:
             progress_callback(0, total, "Fetching price data...")
 
         price_data = self.price_source.get_history_batch(
-            tickers, period=PRICE_HISTORY_PERIOD, batch_size=100
+            surviving_tickers, period=PRICE_HISTORY_PERIOD
         )
 
-        # -------- المرحلة 3: باقي التحليل --------
+        # -------- المرحلة 4: باقي التحليل --------
         results: List[StockResult] = []
         done_count = 0
 
@@ -92,7 +148,7 @@ class Screener:
                     price_data.get(ticker),
                     reverse_split_map[ticker],
                 ): ticker
-                for ticker in tickers
+                for ticker in surviving_tickers
             }
 
             for future in as_completed(future_map):
