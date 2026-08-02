@@ -16,7 +16,6 @@ import pandas as pd
 import streamlit as st
 
 
-
 from config import (
     BASE_DAYS_OPTIONS,
     DEFAULT_MAX_DISTANCE_FROM_SUPPORT,
@@ -57,6 +56,14 @@ with st.sidebar:
         index=REVERSE_SPLIT_LOOKBACK_OPTIONS.index(DEFAULT_REVERSE_SPLIT_LOOKBACK),
     )
 
+    max_post_split_rise = st.slider(
+        "Max rise right after split (%)",
+        min_value=10,
+        max_value=200,
+        value=50,
+        step=10,
+    )
+
     min_touches = st.selectbox(
         "Minimum touches on support",
         TOUCHES_OPTIONS,
@@ -66,7 +73,7 @@ with st.sidebar:
     tolerance_pct = st.slider(
         "Support zone tolerance (%)",
         min_value=0.5,
-        max_value=5.0,
+        max_value=10.0,
         value=DEFAULT_SUPPORT_TOLERANCE_PCT,
         step=0.5,
     )
@@ -102,8 +109,17 @@ with st.sidebar:
 
     st.divider()
     st.subheader("Performance filters (to speed up scanning)")
+    min_price = st.number_input(
+        "Min stock price ($)", min_value=0.0, max_value=500.0, value=1.0
+    )
     max_price = st.number_input(
         "Max stock price ($)", min_value=1.0, max_value=500.0, value=DEFAULT_MAX_PRICE
+    )
+    max_market_cap = st.number_input(
+        "Max market cap ($)",
+        min_value=1_000_000.0,
+        value=300_000_000.0,
+        step=50_000_000.0,
     )
     min_dollar_volume = st.number_input(
         "Min daily dollar volume ($)",
@@ -121,6 +137,7 @@ with st.sidebar:
 if run_button:
     params = ScreenerParams(
         reverse_split_lookback_days=reverse_split_lookback,
+        max_post_split_rise_pct=max_post_split_rise,
         min_short_float_pct=min_short_float,
         min_touches=min_touches,
         min_base_days=min_base_days,
@@ -128,6 +145,8 @@ if run_button:
         max_distance_from_support_pct=max_distance,
         exclude_impactful_news=exclude_news,
         max_price=max_price,
+        min_price=min_price,
+        max_market_cap=max_market_cap,
         min_dollar_volume=min_dollar_volume,
         max_results=max_results,
     )
