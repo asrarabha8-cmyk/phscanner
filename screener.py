@@ -9,7 +9,7 @@ those layers knows about the other (Clean Architecture).
 1. الترشيح الأولي بالسعر/القيمة السوقية (NASDAQ Screener، مجاني وسريع)
 2. فحص Reverse Split (Polygon) على القائمة المصغّرة
 3. جلب السعر التاريخي (Polygon) فقط على الأسهم اللي عندها Reverse Split
-4. باقي التحليل، مع تسجيل سبب الاستبعاد لكل سهم لتشخيص الفلاتر
+4. باقي التحليل، مع تصنيف الأسهم "القريبة من التأهل" في قائمة منفصلة
 """
 
 import logging
@@ -19,7 +19,7 @@ from datetime import date
 from typing import Callable, List, Optional, Tuple
 
 from config import PRICE_HISTORY_PERIOD, RVOL_AVERAGE_WINDOW, TARGET_EXCHANGES
-from core.models import ScreenerParams, StockResult
+from core.models import NearMissResult, ScreenerParams, StockResult
 from data_sources.base import (
     NewsSource,
     PriceDataSource,
@@ -40,6 +40,9 @@ from analysis.scorer import PhoenixScorer
 logger = logging.getLogger(__name__)
 
 ProgressCallback = Callable[[int, int, str], None]
+
+# هامش "القرب من التأهل" لشرط الصعود بعد التقسيم
+_NEAR_MISS_RISE_MARGIN_PCT = 20.0  # مثلاً: حد 50% يصبح نطاق قرب حتى 70%
 
 
 class Screener:
@@ -63,7 +66,7 @@ class Screener:
         self,
         params: ScreenerParams,
         progress_callback: Optional[ProgressCallback] = None,
-    ) -> List[StockResult]:
+    ) -> Tuple[List[StockResult], List[NearMissResult]]:
         # -------- المرحلة 1: الترشيح الأولي بالسعر/القيمة السوقية --------
         tickers = self.universe_source.get_tickers(TARGET_EXCHANGES)
 
@@ -124,7 +127,7 @@ class Screener:
             progress_callback(0, total, f"{total} tickers have a recent reverse split")
 
         if total == 0:
-            return []
+            return [], []
 
         # -------- المرحلة 3: جلب السعر التاريخي (Polygon) --------
         if progress_callback:
@@ -134,8 +137,9 @@ class Screener:
             surviving_tickers, period=PRICE_HISTORY_PERIOD
         )
 
-        # -------- المرحلة 4: باقي التحليل + تشخيص أسباب الاستبعاد --------
+        # -------- المرحلة 4: باقي التحليل + تصنيف القريبين من التأهل --------
         results: List[StockResult] = []
+        near_misses: List[NearMissResult] = []
         rejection_reasons: Counter = Counter()
         done_count = 0
 
@@ -155,11 +159,13 @@ class Screener:
                 ticker = future_map[future]
                 done_count += 1
                 try:
-                    result, reason = future.result()
+                    result, reason, near_miss = future.result()
                     if result is not None:
                         results.append(result)
                     else:
                         rejection_reasons[reason] += 1
+                        if near_miss is not None:
+                            near_misses.append(near_miss)
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("Unexpected error analyzing %s: %s", ticker, exc)
                     rejection_reasons["exception"] += 1
@@ -167,71 +173,98 @@ class Screener:
                 if progress_callback and done_count % 10 == 0:
                     progress_callback(done_count, total, ticker)
 
-        # -------- طباعة ملخص أسباب الاستبعاد --------
         logger.warning(
-            "المرحلة 4: ملخص الاستبعاد من أصل %d سهم -- %s",
+            "المرحلة 4: ملخص الاستبعاد من أصل %d سهم -- %s -- %d سهم قريب من التأهل",
             total,
             dict(rejection_reasons.most_common()),
+            len(near_misses),
         )
 
         results.sort(key=lambda r: r.score.total, reverse=True)
-        return results[: params.max_results]
+        near_misses.sort(key=lambda n: n.gap_description)
+        return results[: params.max_results], near_misses
 
     # ----------------------------------------------------------------
     def _check_post_split_rise(
         self, df, split_date: date, max_rise_pct: float
-    ) -> bool:
+    ) -> Tuple[bool, float]:
+        """يرجع (نجح الشرط، نسبة الصعود الفعلية) للاستخدام بتصنيف القرب."""
         after_split = df[df.index.date >= split_date]
         if after_split.empty or len(after_split) < 2:
-            return True
+            return True, 0.0
 
         first_close = float(after_split["Close"].iloc[0])
         if first_close <= 0:
-            return True
+            return True, 0.0
 
         highest_after = float(after_split["High"].max())
         rise_pct = (highest_after - first_close) / first_close * 100
 
-        return rise_pct <= max_rise_pct
+        return rise_pct <= max_rise_pct, rise_pct
 
     # ----------------------------------------------------------------
     def _process_ticker(
         self, ticker: str, params: ScreenerParams, df=None, reverse_split=None
-    ) -> Tuple[Optional[StockResult], str]:
+    ) -> Tuple[Optional[StockResult], str, Optional[NearMissResult]]:
         if df is None or df.empty:
-            return None, "no_price_data"
+            return None, "no_price_data", None
         if reverse_split is None:
-            return None, "no_reverse_split"
+            return None, "no_reverse_split", None
 
         last_price = float(df["Close"].iloc[-1])
         if last_price > params.max_price or last_price < params.min_price:
-            return None, "price_out_of_range"
+            return None, "price_out_of_range", None
 
         avg_dollar_volume = float((df["Close"] * df["Volume"]).tail(20).mean())
         if avg_dollar_volume < params.min_dollar_volume:
-            return None, "low_dollar_volume"
+            return None, "low_dollar_volume", None
 
-        if not self._check_post_split_rise(
+        rise_ok, rise_pct = self._check_post_split_rise(
             df, reverse_split.split_date, params.max_post_split_rise_pct
-        ):
-            return None, "post_split_rise_too_high"
+        )
+        if not rise_ok:
+            near_miss_margin = params.max_post_split_rise_pct + _NEAR_MISS_RISE_MARGIN_PCT
+            if rise_pct <= near_miss_margin:
+                near_miss = NearMissResult(
+                    ticker=ticker,
+                    price=last_price,
+                    gap_description=(
+                        f"صعد {rise_pct:.1f}% بعد التقسيم (الحد المسموح "
+                        f"{params.max_post_split_rise_pct:.0f}%)"
+                    ),
+                )
+                return None, "post_split_rise_too_high", near_miss
+            return None, "post_split_rise_too_high", None
 
         detector = SupportDetector()
         support_zone = detector.detect(
             df,
             tolerance_pct=params.support_tolerance_pct,
-            min_touches=params.min_touches,
+            min_touches=max(2, params.min_touches - 1),  # نسمح بارتداد أقل للفحص هنا
             min_base_days=params.min_base_days,
         )
+
         if support_zone is None:
-            return None, "no_support_zone_found"
+            return None, "no_support_zone_found", None
+
+        if support_zone.touches < params.min_touches:
+            near_miss = NearMissResult(
+                ticker=ticker,
+                price=last_price,
+                gap_description=(
+                    f"عدد ارتدادات الدعم {support_zone.touches} فقط "
+                    f"(المطلوب {params.min_touches})"
+                ),
+            )
+            return None, "not_enough_touches", near_miss
+
         if support_zone.broken:
-            return None, "support_zone_broken"
+            return None, "support_zone_broken", None
 
         zone_mid = (support_zone.zone_low + support_zone.zone_high) / 2
         distance_from_support_pct = (last_price - zone_mid) / zone_mid * 100
         if distance_from_support_pct > params.max_distance_from_support_pct:
-            return None, "too_far_from_support"
+            return None, "too_far_from_support", None
 
         volume_analyzer = VolumeAnalyzer(rvol_window=RVOL_AVERAGE_WINDOW)
         volume_profile = volume_analyzer.analyze(df, support_zone.base_days)
@@ -239,12 +272,12 @@ class Screener:
         if params.exclude_impactful_news:
             news_check = self.news_source.check_impactful_news(ticker, lookback_days=14)
             if news_check.has_impactful_news:
-                return None, "impactful_news"
+                return None, "impactful_news", None
 
         short_interest = self.short_interest_source.get_short_interest(ticker)
         if params.min_short_float_pct is not None and short_interest.short_float_pct is not None:
             if short_interest.short_float_pct < params.min_short_float_pct:
-                return None, "low_short_float"
+                return None, "low_short_float", None
 
         scorer = PhoenixScorer(tolerance_pct=params.support_tolerance_pct)
         score = scorer.score(reverse_split, support_zone, volume_profile)
@@ -259,4 +292,4 @@ class Screener:
             short_interest=short_interest,
             score=score,
         )
-        return result, "passed"
+        return result, "passed", None
