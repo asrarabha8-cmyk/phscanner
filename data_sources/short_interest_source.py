@@ -68,7 +68,7 @@ class CompositeShortInterestSource(ShortInterestSource):
             if not results:
                 return None
 
-            short_shares = float(results[0].get("short_interest", 0))
+            short_shares = float(results[0].get("short_interest") or 0)
             if short_shares <= 0:
                 return None
 
@@ -79,11 +79,17 @@ class CompositeShortInterestSource(ShortInterestSource):
             )
             resp2.raise_for_status()
             ticker_info = resp2.json().get("results") or {}
-            shares_outstanding = float(ticker_info.get("share_class_shares_outstanding", 0))
-            if shares_outstanding <= 0:
+            shares_outstanding = float(ticker_info.get("share_class_shares_outstanding") or 0)
+
+            # حماية إضافية من القسمة على صفر أو قيم غير منطقية
+            if shares_outstanding <= 0 or short_shares <= 0:
                 return None
 
-            return round((short_shares / shares_outstanding) * 100, 2)
+            pct = (short_shares / shares_outstanding) * 100
+            if pct <= 0:
+                return None
+
+            return round(pct, 2)
 
         except Exception as exc:  # noqa: BLE001
             logger.debug("لا تتوفر بيانات Short Interest (Polygon) لـ %s: %s", ticker, exc)
