@@ -14,6 +14,7 @@ import logging
 
 import pandas as pd
 import streamlit as st
+import test_polygon
 
 from config import (
     BASE_DAYS_OPTIONS,
