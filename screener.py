@@ -7,17 +7,16 @@ those layers knows about the other (Clean Architecture).
 
 ترتيب المراحل (بعد الاشتراك بـ Polygon Stocks Starter -- طلبات غير محدودة):
 1. الترشيح الأولي بالسعر/القيمة السوقية (NASDAQ Screener، مجاني وسريع)
-   -- يقلل العدد من آلاف الأسهم لبضع مئات قبل أي طلب لـ Polygon
-2. فحص Reverse Split (Polygon) على القائمة المصغّرة -- بالتوازي، بدون حدود
+2. فحص Reverse Split (Polygon) على القائمة المصغّرة
 3. جلب السعر التاريخي (Polygon) فقط على الأسهم اللي عندها Reverse Split
-4. باقي التحليل (Support, Volume, News, Short Interest، وفلتر الصعود
-   بعد التقسيم)
+4. باقي التحليل، مع تسجيل سبب الاستبعاد لكل سهم لتشخيص الفلاتر
 """
 
 import logging
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Tuple
 
 from config import PRICE_HISTORY_PERIOD, RVOL_AVERAGE_WINDOW, TARGET_EXCHANGES
 from core.models import ScreenerParams, StockResult
@@ -135,8 +134,9 @@ class Screener:
             surviving_tickers, period=PRICE_HISTORY_PERIOD
         )
 
-        # -------- المرحلة 4: باقي التحليل --------
+        # -------- المرحلة 4: باقي التحليل + تشخيص أسباب الاستبعاد --------
         results: List[StockResult] = []
+        rejection_reasons: Counter = Counter()
         done_count = 0
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -155,14 +155,24 @@ class Screener:
                 ticker = future_map[future]
                 done_count += 1
                 try:
-                    result = future.result()
+                    result, reason = future.result()
                     if result is not None:
                         results.append(result)
+                    else:
+                        rejection_reasons[reason] += 1
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("Unexpected error analyzing %s: %s", ticker, exc)
+                    rejection_reasons["exception"] += 1
 
                 if progress_callback and done_count % 10 == 0:
                     progress_callback(done_count, total, ticker)
+
+        # -------- طباعة ملخص أسباب الاستبعاد --------
+        logger.warning(
+            "المرحلة 4: ملخص الاستبعاد من أصل %d سهم -- %s",
+            total,
+            dict(rejection_reasons.most_common()),
+        )
 
         results.sort(key=lambda r: r.score.total, reverse=True)
         return results[: params.max_results]
@@ -187,22 +197,24 @@ class Screener:
     # ----------------------------------------------------------------
     def _process_ticker(
         self, ticker: str, params: ScreenerParams, df=None, reverse_split=None
-    ) -> Optional[StockResult]:
-        if df is None or df.empty or reverse_split is None:
-            return None
+    ) -> Tuple[Optional[StockResult], str]:
+        if df is None or df.empty:
+            return None, "no_price_data"
+        if reverse_split is None:
+            return None, "no_reverse_split"
 
         last_price = float(df["Close"].iloc[-1])
         if last_price > params.max_price or last_price < params.min_price:
-            return None
+            return None, "price_out_of_range"
 
         avg_dollar_volume = float((df["Close"] * df["Volume"]).tail(20).mean())
         if avg_dollar_volume < params.min_dollar_volume:
-            return None
+            return None, "low_dollar_volume"
 
         if not self._check_post_split_rise(
             df, reverse_split.split_date, params.max_post_split_rise_pct
         ):
-            return None
+            return None, "post_split_rise_too_high"
 
         detector = SupportDetector()
         support_zone = detector.detect(
@@ -211,13 +223,15 @@ class Screener:
             min_touches=params.min_touches,
             min_base_days=params.min_base_days,
         )
-        if support_zone is None or support_zone.broken:
-            return None
+        if support_zone is None:
+            return None, "no_support_zone_found"
+        if support_zone.broken:
+            return None, "support_zone_broken"
 
         zone_mid = (support_zone.zone_low + support_zone.zone_high) / 2
         distance_from_support_pct = (last_price - zone_mid) / zone_mid * 100
         if distance_from_support_pct > params.max_distance_from_support_pct:
-            return None
+            return None, "too_far_from_support"
 
         volume_analyzer = VolumeAnalyzer(rvol_window=RVOL_AVERAGE_WINDOW)
         volume_profile = volume_analyzer.analyze(df, support_zone.base_days)
@@ -225,17 +239,17 @@ class Screener:
         if params.exclude_impactful_news:
             news_check = self.news_source.check_impactful_news(ticker, lookback_days=14)
             if news_check.has_impactful_news:
-                return None
+                return None, "impactful_news"
 
         short_interest = self.short_interest_source.get_short_interest(ticker)
         if params.min_short_float_pct is not None and short_interest.short_float_pct is not None:
             if short_interest.short_float_pct < params.min_short_float_pct:
-                return None
+                return None, "low_short_float"
 
         scorer = PhoenixScorer(tolerance_pct=params.support_tolerance_pct)
         score = scorer.score(reverse_split, support_zone, volume_profile)
 
-        return StockResult(
+        result = StockResult(
             ticker=ticker,
             price=last_price,
             support_zone=support_zone,
@@ -245,3 +259,4 @@ class Screener:
             short_interest=short_interest,
             score=score,
         )
+        return result, "passed"
