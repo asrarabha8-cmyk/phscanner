@@ -16,11 +16,13 @@ class ScreenerParams:
 
     reverse_split_lookback_days: int = 90
     max_post_split_rise_pct: float = 20.0  # الحد الأقصى للصعود بعد التقسيم مباشرة
+    min_price_drop_pct: float = 40.0       # نسبة الهبوط المطلوبة من القمة
+    decline_window_days: int = 30          # نافذة رصد القمة قبل الهبوط
     min_short_float_pct: Optional[float] = 15.0
-    min_touches: int = 3
+    min_touches: int = 2
     min_base_days: int = 20
-    support_tolerance_pct: float = 2.0
-    max_distance_from_support_pct: float = 5.0
+    support_tolerance_pct: float = 4.0
+    max_distance_from_support_pct: float = 8.0
     exclude_impactful_news: bool = True
 
     # فلاتر أداء مسبقة (ليست من متطلبات المستخدم المباشرة لكنها ضرورية عمليًا)
