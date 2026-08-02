@@ -1,35 +1,38 @@
 """
 data_sources/short_interest_source.py
 ----------------------------------------
-Short Float% : لا يوجد مصدر مجاني موثوق يعطي هذه النسبة لحظيًا لكل الأسهم.
-              هذه المرحلة (1) تترك القيمة None ويُعامَل فلتر Short Float
-              على أنه "غير مُفعَّل تلقائيًا" حتى يوفّر المستخدم مفتاح API
-              لمزود مثل Fintel أو Ortex (راجع config.FINTEL_API_KEY).
+يستخدم Polygon.io لجلب بيانات Short Interest وBorrow Fee.
 
-Borrow Fee%  : نستخدم iBorrowDesk (مجاني، بدون مفتاح) الذي يجمّع بيانات
-              Borrow Fee من عدة وسطاء (بشكل غير رسمي لكنه مستخدم بشكل واسع
-              من مجتمع المتداولين).
+Short Interest: من endpoint /stocks/v1/short-interest (يرجع عدد الأسهم
+المكشوفة، يُحسب منها Short Float % بالقسمة على عدد الأسهم القائمة).
+Short Float % محسوب محليًا لأن Polygon يرجع عدد أسهم خام لا نسبة جاهزة.
 
-هذا الملف مصمم بحيث لا يفشل السكرينر بالكامل إذا تعذّر الوصول لأي مصدر:
-سيُعاد ShortInterestInfo(available=False) وتتعامل طبقة التسجيل (scorer)
-مع ذلك بإعطاء 0 لهذا المكوّن بدل توقف البرنامج.
+Borrow Fee: لا يزال يُجلب من iBorrowDesk (مجاني) لأن Polygon Stocks
+Starter لا يشمل بيانات borrow fee.
 """
 
 import logging
+from datetime import date, timedelta
 
 import requests
+import streamlit as st
 
-from config import IBORROWDESK_BASE_URL, FINTEL_API_KEY
+from config import IBORROWDESK_BASE_URL
 from core.models import ShortInterestInfo
 from data_sources.base import ShortInterestSource
 
 logger = logging.getLogger(__name__)
 
+POLYGON_BASE_URL = "https://api.polygon.io"
+
 
 class CompositeShortInterestSource(ShortInterestSource):
+    def __init__(self):
+        self.api_key = st.secrets["POLYGON_API_KEY"]
+
     def get_short_interest(self, ticker: str) -> ShortInterestInfo:
         borrow_fee = self._get_borrow_fee(ticker)
-        short_float = self._get_short_float(ticker)
+        short_float = self._get_short_float_pct(ticker)
 
         available = borrow_fee is not None or short_float is not None
         return ShortInterestInfo(
@@ -37,6 +40,40 @@ class CompositeShortInterestSource(ShortInterestSource):
             borrow_fee_pct=borrow_fee,
             available=available,
         )
+
+    def _get_short_float_pct(self, ticker: str):
+        try:
+            # أحدث تقرير short interest (مرتين بالشهر)
+            resp = requests.get(
+                f"{POLYGON_BASE_URL}/stocks/v1/short-interest",
+                params={"ticker": ticker, "limit": 1, "sort": "settlement_date.desc", "apiKey": self.api_key},
+                timeout=15,
+            )
+            resp.raise_for_status()
+            results = resp.json().get("results") or []
+            if not results:
+                return None
+            short_shares = float(results[0].get("short_interest", 0))
+            if short_shares <= 0:
+                return None
+
+            # عدد الأسهم القائمة (shares outstanding)
+            resp2 = requests.get(
+                f"{POLYGON_BASE_URL}/v3/reference/tickers/{ticker}",
+                params={"apiKey": self.api_key},
+                timeout=15,
+            )
+            resp2.raise_for_status()
+            ticker_info = resp2.json().get("results") or {}
+            shares_outstanding = float(ticker_info.get("share_class_shares_outstanding", 0))
+            if shares_outstanding <= 0:
+                return None
+
+            return round((short_shares / shares_outstanding) * 100, 2)
+
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("لا تتوفر بيانات Short Interest (Polygon) لـ %s: %s", ticker, exc)
+            return None
 
     def _get_borrow_fee(self, ticker: str):
         try:
@@ -51,15 +88,4 @@ class CompositeShortInterestSource(ShortInterestSource):
             return float(latest.get("fee"))
         except Exception as exc:  # noqa: BLE001
             logger.debug("لا تتوفر بيانات Borrow Fee لـ %s: %s", ticker, exc)
-            return None
-
-    def _get_short_float(self, ticker: str):
-        if not FINTEL_API_KEY:
-            # المرحلة 2: استبدال هذا باستدعاء فعلي لـ Fintel/Ortex عند توفر مفتاح
-            return None
-        try:
-            # نقطة تمديد جاهزة للمرحلة القادمة — لم يتم تفعيلها لعدم توفر مفتاح افتراضي
-            return None
-        except Exception as exc:  # noqa: BLE001
-            logger.debug("لا تتوفر بيانات Short Float لـ %s: %s", ticker, exc)
             return None
