@@ -161,7 +161,7 @@ if run_button:
 
     with st.spinner("Scanning... this can take several minutes depending on market size"):
         screener = Screener()
-        results = screener.run(params, progress_callback=_on_progress)
+        results, near_misses = screener.run(params, progress_callback=_on_progress)
 
     progress_bar.progress(1.0)
     status_text.empty()
@@ -177,5 +177,16 @@ if run_button:
             use_container_width=True,
             hide_index=True,
         )
+
+    if near_misses:
+        st.divider()
+        st.subheader("🔎 Near-miss stocks (worth a manual look)")
+        st.caption(
+            "These stocks failed one filter by a small margin -- review them "
+            "yourself before deciding to skip."
+        )
+        near_rows = [n.to_row() for n in near_misses]
+        df_near = pd.DataFrame(near_rows)
+        st.dataframe(df_near, use_container_width=True, hide_index=True)
 else:
     st.info("Set your criteria in the sidebar, then click \"Run Scan\".")
