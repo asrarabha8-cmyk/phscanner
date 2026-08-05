@@ -15,7 +15,7 @@ class ScreenerParams:
     """كل المعايير القابلة للتحكم من واجهة المستخدم."""
 
     reverse_split_lookback_days: int = 90
-    max_post_split_rise_pct: float = 20.0  # الحد الأقصى للصعود بعد التقسيم مباشرة
+    max_post_split_rise_pct: float = 20.0
     min_price_drop_pct: float = 40.0
     decline_window_days: int = 30
     min_short_float_pct: Optional[float] = 15.0
@@ -25,10 +25,9 @@ class ScreenerParams:
     max_distance_from_support_pct: float = 8.0
     exclude_impactful_news: bool = True
 
-    # فلاتر أداء مسبقة (ليست من متطلبات المستخدم المباشرة لكنها ضرورية عمليًا)
     max_price: float = 10.00
     min_price: float = 1.0
-    max_market_cap: float = 300_000_000  # 300 مليون دولار كبداية
+    max_market_cap: float = 300_000_000
     min_dollar_volume: float = 300_000
     max_results: int = 50
 
@@ -36,27 +35,25 @@ class ScreenerParams:
 @dataclass
 class ReverseSplitInfo:
     split_date: date
-    ratio: float  # مثال: 1-for-10 تُخزَّن كـ 0.1
+    ratio: float
 
 
 @dataclass
 class SupportZone:
-    """منطقة دعم مكتشفة: ليست سعرًا واحدًا بل نطاقًا ارتد السهم منه عدة مرات."""
-
     zone_low: float
     zone_high: float
     touches: int
     touch_dates: List[date]
     base_start_date: date
     base_days: int
-    first_touch_low: float  # ذيل شمعة القاع الأول -- يُستخدم كوقف خسارة
-    broken: bool  # True إذا كان هناك إغلاق يومي تحت الدعم خلال فترة القاعدة
+    first_touch_low: float
+    broken: bool
 
 
 @dataclass
 class VolumeProfile:
-    dryup_ratio: float          # < 1 يعني أن الفوليوم انخفض تدريجيًا (جيد)
-    relative_volume: float      # RVOL الحالي
+    dryup_ratio: float
+    relative_volume: float
 
 
 @dataclass
@@ -95,8 +92,6 @@ class ScoreBreakdown:
 
 @dataclass
 class StockResult:
-    """الصف النهائي الذي يُعرض في جدول الواجهة."""
-
     ticker: str
     price: float
     support_zone: SupportZone
@@ -139,15 +134,44 @@ class StockResult:
 
 @dataclass
 class NearMissResult:
-    """سهم فشل بشرط واحد بفارق بسيط -- يُعرض بجدول منفصل للمراجعة اليدوية."""
-
     ticker: str
     price: float
-    gap_description: str  # شرح مختصر لسبب القرب من التأهل
+    gap_description: str
 
     def to_row(self) -> dict:
         return {
             "Ticker": self.ticker,
             "Price": round(self.price, 3),
             "Why it's close": self.gap_description,
+        }
+
+
+@dataclass
+class TrackedStock:
+    """سجل دائم لسهم اكتُشف بالسكانر -- يُستخدم لمتابعة أدائه بمرور الوقت."""
+
+    ticker: str
+    discovery_date: date
+    discovery_price: float
+    kind: str  # "result" أو "near_miss"
+    reason: str  # "passed" لو نتيجة رئيسية، أو سبب القرب لو near_miss
+    last_checked_date: Optional[date] = None
+    last_price: Optional[float] = None
+
+    @property
+    def change_pct(self) -> Optional[float]:
+        if self.last_price is None or self.discovery_price <= 0:
+            return None
+        return round((self.last_price - self.discovery_price) / self.discovery_price * 100, 2)
+
+    def to_row(self) -> dict:
+        return {
+            "Ticker": self.ticker,
+            "Type": "Result" if self.kind == "result" else "Near-miss",
+            "Discovery Date": self.discovery_date.isoformat(),
+            "Discovery Price": round(self.discovery_price, 3),
+            "Last Checked": self.last_checked_date.isoformat() if self.last_checked_date else "N/A",
+            "Last Price": round(self.last_price, 3) if self.last_price is not None else "N/A",
+            "Change %": self.change_pct if self.change_pct is not None else "N/A",
+            "Reason": self.reason,
         }
