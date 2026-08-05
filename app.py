@@ -11,6 +11,7 @@ To run:
 """
 
 import logging
+from datetime import date
 
 import pandas as pd
 import streamlit as st
@@ -32,161 +33,212 @@ from config import (
     TOUCHES_OPTIONS,
 )
 from core.models import ScreenerParams
+from data_sources.github_storage import read_tracked_stocks, write_tracked_stocks
+from data_sources.price_source import PolygonPriceSource
 from screener import Screener
 
 logging.basicConfig(level=logging.WARNING)
 
 st.set_page_config(page_title="Phoenix Scanner", layout="wide")
 
-st.title("🔥 Phoenix Scanner")
-st.caption(
-    "Discover US accumulation stocks before the breakout -- based purely on "
-    "price behavior, real support zones, and volume. No RSI / MACD / Stochastic."
-)
+tab_scan, tab_tracked = st.tabs(["🔥 Scanner", "📊 Tracked Stocks"])
 
-# ----------------------------------------------------------------------
-# Sidebar: every tunable filter
-# ----------------------------------------------------------------------
-with st.sidebar:
-    st.header("⚙️ Screening Criteria")
-
-    reverse_split_lookback = st.selectbox(
-        "Reverse Split lookback (days)",
-        REVERSE_SPLIT_LOOKBACK_OPTIONS,
-        index=REVERSE_SPLIT_LOOKBACK_OPTIONS.index(DEFAULT_REVERSE_SPLIT_LOOKBACK),
+# ========================================================================
+# التبويب الأول: السكانر
+# ========================================================================
+with tab_scan:
+    st.title("🔥 Phoenix Scanner")
+    st.caption(
+        "Discover US accumulation stocks before the breakout -- based purely on "
+        "price behavior, real support zones, and volume. No RSI / MACD / Stochastic."
     )
 
-    max_post_split_rise = st.slider(
-        "Max rise right after split (%)",
-        min_value=10,
-        max_value=200,
-        value=50,
-        step=10,
-    )
+    with st.sidebar:
+        st.header("⚙️ Screening Criteria")
 
-    min_touches = st.selectbox(
-        "Minimum touches on support",
-        TOUCHES_OPTIONS,
-        index=TOUCHES_OPTIONS.index(DEFAULT_MIN_TOUCHES),
-    )
-
-    tolerance_pct = st.slider(
-        "Support zone tolerance (%)",
-        min_value=0.5,
-        max_value=10.0,
-        value=DEFAULT_SUPPORT_TOLERANCE_PCT,
-        step=0.5,
-    )
-
-    min_base_days = st.selectbox(
-        "Minimum base duration (sessions)",
-        BASE_DAYS_OPTIONS,
-        index=BASE_DAYS_OPTIONS.index(DEFAULT_MIN_BASE_DAYS),
-    )
-
-    max_distance = st.selectbox(
-        "Max distance from support (%)",
-        DISTANCE_FROM_SUPPORT_OPTIONS,
-        index=DISTANCE_FROM_SUPPORT_OPTIONS.index(int(DEFAULT_MAX_DISTANCE_FROM_SUPPORT)),
-    )
-
-    st.divider()
-
-    enable_short_float = st.checkbox("Enable Short Float filter", value=False)
-    min_short_float = None
-    if enable_short_float:
-        min_short_float = st.selectbox(
-            "Minimum Short Float (%)",
-            SHORT_FLOAT_OPTIONS,
-            index=SHORT_FLOAT_OPTIONS.index(DEFAULT_SHORT_FLOAT_MIN),
-        )
-        st.caption(
-            "Short Float data isn't freely available for every ticker in this "
-            "phase. The filter only applies to tickers where data is available."
+        reverse_split_lookback = st.selectbox(
+            "Reverse Split lookback (days)",
+            REVERSE_SPLIT_LOOKBACK_OPTIONS,
+            index=REVERSE_SPLIT_LOOKBACK_OPTIONS.index(DEFAULT_REVERSE_SPLIT_LOOKBACK),
         )
 
-    exclude_news = st.checkbox("Exclude stocks with impactful news", value=True)
-
-    st.divider()
-    st.subheader("Performance filters (to speed up scanning)")
-    min_price = st.number_input(
-        "Min stock price ($)", min_value=0.0, max_value=500.0, value=1.0
-    )
-    max_price = st.number_input(
-        "Max stock price ($)", min_value=1.0, max_value=500.0, value=DEFAULT_MAX_PRICE
-    )
-    max_market_cap = st.number_input(
-        "Max market cap ($)",
-        min_value=1_000_000.0,
-        value=300_000_000.0,
-        step=50_000_000.0,
-    )
-    min_dollar_volume = st.number_input(
-        "Min daily dollar volume ($)",
-        min_value=0.0,
-        value=float(DEFAULT_MIN_DOLLAR_VOLUME),
-        step=50_000.0,
-    )
-    max_results = st.slider("Max results shown", 10, 100, 50, step=10)
-
-    run_button = st.button("🚀 Run Scan", type="primary", use_container_width=True)
-
-# ----------------------------------------------------------------------
-# Execution
-# ----------------------------------------------------------------------
-if run_button:
-    params = ScreenerParams(
-        reverse_split_lookback_days=reverse_split_lookback,
-        max_post_split_rise_pct=max_post_split_rise,
-        min_short_float_pct=min_short_float,
-        min_touches=min_touches,
-        min_base_days=min_base_days,
-        support_tolerance_pct=tolerance_pct,
-        max_distance_from_support_pct=max_distance,
-        exclude_impactful_news=exclude_news,
-        max_price=max_price,
-        min_price=min_price,
-        max_market_cap=max_market_cap,
-        min_dollar_volume=min_dollar_volume,
-        max_results=max_results,
-    )
-
-    progress_bar = st.progress(0.0)
-    status_text = st.empty()
-
-    def _on_progress(done: int, total: int, current: str):
-        ratio = 0.0 if total == 0 else min(done / total, 1.0)
-        progress_bar.progress(ratio)
-        status_text.text(f"Scanned {done}/{total} -- last ticker: {current}")
-
-    with st.spinner("Scanning... this can take several minutes depending on market size"):
-        screener = Screener()
-        results, near_misses = screener.run(params, progress_callback=_on_progress)
-
-    progress_bar.progress(1.0)
-    status_text.empty()
-
-    if not results:
-        st.warning("No matching stocks found. Try loosening the filters.")
-    else:
-        st.success(f"✅ Found {len(results)} matching stocks")
-        rows = [r.to_row() for r in results]
-        df_results = pd.DataFrame(rows)
-        st.dataframe(
-            df_results.sort_values("Phoenix Score", ascending=False),
-            use_container_width=True,
-            hide_index=True,
+        max_post_split_rise = st.slider(
+            "Max rise right after split (%)",
+            min_value=10,
+            max_value=200,
+            value=50,
+            step=10,
         )
 
-    if near_misses:
+        min_touches = st.selectbox(
+            "Minimum touches on support",
+            TOUCHES_OPTIONS,
+            index=TOUCHES_OPTIONS.index(DEFAULT_MIN_TOUCHES),
+        )
+
+        tolerance_pct = st.slider(
+            "Support zone tolerance (%)",
+            min_value=0.5,
+            max_value=10.0,
+            value=DEFAULT_SUPPORT_TOLERANCE_PCT,
+            step=0.5,
+        )
+
+        min_base_days = st.selectbox(
+            "Minimum base duration (sessions)",
+            BASE_DAYS_OPTIONS,
+            index=BASE_DAYS_OPTIONS.index(DEFAULT_MIN_BASE_DAYS),
+        )
+
+        max_distance = st.selectbox(
+            "Max distance from support (%)",
+            DISTANCE_FROM_SUPPORT_OPTIONS,
+            index=DISTANCE_FROM_SUPPORT_OPTIONS.index(int(DEFAULT_MAX_DISTANCE_FROM_SUPPORT)),
+        )
+
         st.divider()
-        st.subheader("🔎 Near-miss stocks (worth a manual look)")
-        st.caption(
-            "These stocks failed one filter by a small margin -- review them "
-            "yourself before deciding to skip."
+
+        enable_short_float = st.checkbox("Enable Short Float filter", value=False)
+        min_short_float = None
+        if enable_short_float:
+            min_short_float = st.selectbox(
+                "Minimum Short Float (%)",
+                SHORT_FLOAT_OPTIONS,
+                index=SHORT_FLOAT_OPTIONS.index(DEFAULT_SHORT_FLOAT_MIN),
+            )
+            st.caption(
+                "Short Float data isn't freely available for every ticker in this "
+                "phase. The filter only applies to tickers where data is available."
+            )
+
+        exclude_news = st.checkbox("Exclude stocks with impactful news", value=True)
+
+        st.divider()
+        st.subheader("Performance filters (to speed up scanning)")
+        min_price = st.number_input(
+            "Min stock price ($)", min_value=0.0, max_value=500.0, value=1.0
         )
-        near_rows = [n.to_row() for n in near_misses]
-        df_near = pd.DataFrame(near_rows)
-        st.dataframe(df_near, use_container_width=True, hide_index=True)
-else:
-    st.info("Set your criteria in the sidebar, then click \"Run Scan\".")
+        max_price = st.number_input(
+            "Max stock price ($)", min_value=1.0, max_value=500.0, value=DEFAULT_MAX_PRICE
+        )
+        max_market_cap = st.number_input(
+            "Max market cap ($)",
+            min_value=1_000_000.0,
+            value=300_000_000.0,
+            step=50_000_000.0,
+        )
+        min_dollar_volume = st.number_input(
+            "Min daily dollar volume ($)",
+            min_value=0.0,
+            value=float(DEFAULT_MIN_DOLLAR_VOLUME),
+            step=50_000.0,
+        )
+        max_results = st.slider("Max results shown", 10, 100, 50, step=10)
+
+        run_button = st.button("🚀 Run Scan", type="primary", use_container_width=True)
+
+    if run_button:
+        params = ScreenerParams(
+            reverse_split_lookback_days=reverse_split_lookback,
+            max_post_split_rise_pct=max_post_split_rise,
+            min_short_float_pct=min_short_float,
+            min_touches=min_touches,
+            min_base_days=min_base_days,
+            support_tolerance_pct=tolerance_pct,
+            max_distance_from_support_pct=max_distance,
+            exclude_impactful_news=exclude_news,
+            max_price=max_price,
+            min_price=min_price,
+            max_market_cap=max_market_cap,
+            min_dollar_volume=min_dollar_volume,
+            max_results=max_results,
+        )
+
+        progress_bar = st.progress(0.0)
+        status_text = st.empty()
+
+        def _on_progress(done: int, total: int, current: str):
+            ratio = 0.0 if total == 0 else min(done / total, 1.0)
+            progress_bar.progress(ratio)
+            status_text.text(f"Scanned {done}/{total} -- last ticker: {current}")
+
+        with st.spinner("Scanning... this can take several minutes depending on market size"):
+            screener = Screener()
+            results, near_misses = screener.run(params, progress_callback=_on_progress)
+
+        progress_bar.progress(1.0)
+        status_text.empty()
+
+        if not results:
+            st.warning("No matching stocks found. Try loosening the filters.")
+        else:
+            st.success(f"✅ Found {len(results)} matching stocks")
+            rows = [r.to_row() for r in results]
+            df_results = pd.DataFrame(rows)
+            st.dataframe(
+                df_results.sort_values("Phoenix Score", ascending=False),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        if near_misses:
+            st.divider()
+            st.subheader("🔎 Near-miss stocks (worth a manual look)")
+            st.caption(
+                "These stocks failed one filter by a small margin -- review them "
+                "yourself before deciding to skip."
+            )
+            near_rows = [n.to_row() for n in near_misses]
+            df_near = pd.DataFrame(near_rows)
+            st.dataframe(df_near, use_container_width=True, hide_index=True)
+
+        st.caption("📌 All discovered tickers were saved to the Tracked Stocks tab.")
+    else:
+        st.info("Set your criteria in the sidebar, then click \"Run Scan\".")
+
+# ========================================================================
+# التبويب الثاني: سجل المتابعة
+# ========================================================================
+with tab_tracked:
+    st.title("📊 Tracked Stocks")
+    st.caption(
+        "Every stock the scanner has ever found (results and near-misses), "
+        "with its price at discovery and its most recent checked price."
+    )
+
+    tracked = read_tracked_stocks()
+
+    if not tracked:
+        st.info("No tracked stocks yet. Run a scan first.")
+    else:
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            refresh_button = st.button(
+                "🔄 Update current prices", use_container_width=True
+            )
+
+        if refresh_button:
+            price_source = PolygonPriceSource()
+            today = date.today()
+            with st.spinner("Fetching current prices..."):
+                tickers = list({s.ticker for s in tracked})
+                price_data = price_source.get_history_batch(tickers)
+
+                for s in tracked:
+                    df = price_data.get(s.ticker)
+                    if df is not None and not df.empty:
+                        s.last_price = float(df["Close"].iloc[-1])
+                        s.last_checked_date = today
+
+            success = write_tracked_stocks(
+                tracked, f"Update prices as of {today.isoformat()}"
+            )
+            if success:
+                st.success("✅ Prices updated.")
+            else:
+                st.error("Failed to save updated prices. Check logs.")
+
+        rows = [s.to_row() for s in tracked]
+        df_tracked = pd.DataFrame(rows)
+        df_tracked = df_tracked.sort_values("Discovery Date", ascending=False)
+        st.dataframe(df_tracked, use_container_width=True, hide_index=True)
