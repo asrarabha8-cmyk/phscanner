@@ -1,13 +1,9 @@
 """
 data_sources/short_interest_source.py
 ----------------------------------------
-يستخدم Polygon.io لجلب بيانات Short Interest وBorrow Fee.
-
-Short Interest: من endpoint /stocks/v1/short-interest (يرجع عدد الأسهم
-المكشوفة، يُحسب منها Short Float % بالقسمة على عدد الأسهم القائمة).
-
-Borrow Fee: لا يزال يُجلب من iBorrowDesk (مجاني) لأن Polygon Stocks
-Starter لا يشمل بيانات borrow fee.
+يستخدم Polygon.io لجلب بيانات Short Interest.
+Borrow Fee يُجلب من iBorrowDesk (endpoint غير رسمي، بدون توثيق عام) --
+تشخيص مؤقت مضاف للتأكد من شكل الاستجابة الفعلي.
 """
 
 import logging
@@ -23,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 POLYGON_BASE_URL = "https://api.polygon.io"
 
-_logged_sample = False
+_logged_borrow_sample = False
 
 
 class CompositeShortInterestSource(ShortInterestSource):
@@ -42,7 +38,6 @@ class CompositeShortInterestSource(ShortInterestSource):
         )
 
     def _get_short_float_pct(self, ticker: str):
-        global _logged_sample
         try:
             resp = requests.get(
                 f"{POLYGON_BASE_URL}/stocks/v1/short-interest",
@@ -54,15 +49,6 @@ class CompositeShortInterestSource(ShortInterestSource):
                 },
                 timeout=15,
             )
-            if not _logged_sample:
-                logger.warning(
-                    "تشخيص Short Interest: status=%d لـ %s، رد أول 300 حرف: %s",
-                    resp.status_code,
-                    ticker,
-                    resp.text[:300],
-                )
-                _logged_sample = True
-
             resp.raise_for_status()
             results = resp.json().get("results") or []
             if not results:
@@ -81,7 +67,6 @@ class CompositeShortInterestSource(ShortInterestSource):
             ticker_info = resp2.json().get("results") or {}
             shares_outstanding = float(ticker_info.get("share_class_shares_outstanding") or 0)
 
-            # حماية إضافية من القسمة على صفر أو قيم غير منطقية
             if shares_outstanding <= 0 or short_shares <= 0:
                 return None
 
@@ -96,8 +81,19 @@ class CompositeShortInterestSource(ShortInterestSource):
             return None
 
     def _get_borrow_fee(self, ticker: str):
+        global _logged_borrow_sample
         try:
             resp = requests.get(f"{IBORROWDESK_BASE_URL}/{ticker}", timeout=10)
+
+            if not _logged_borrow_sample:
+                logger.warning(
+                    "تشخيص Borrow Fee: URL=%s status=%d رد أول 300 حرف: %s",
+                    f"{IBORROWDESK_BASE_URL}/{ticker}",
+                    resp.status_code,
+                    resp.text[:300],
+                )
+                _logged_borrow_sample = True
+
             if resp.status_code != 200:
                 return None
             data = resp.json()
