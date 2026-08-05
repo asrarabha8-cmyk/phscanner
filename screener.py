@@ -10,6 +10,7 @@ those layers knows about the other (Clean Architecture).
 2. فحص Reverse Split (Polygon) على القائمة المصغّرة
 3. جلب السعر التاريخي (Polygon) فقط على الأسهم اللي عندها Reverse Split
 4. باقي التحليل، مع تصنيف الأسهم "القريبة من التأهل" في قائمة منفصلة
+5. حفظ كل النتائج (رئيسية + قريبة) بسجل المتابعة الدائم على GitHub
 """
 
 import logging
@@ -19,7 +20,7 @@ from datetime import date
 from typing import Callable, List, Optional, Tuple
 
 from config import PRICE_HISTORY_PERIOD, RVOL_AVERAGE_WINDOW, TARGET_EXCHANGES
-from core.models import NearMissResult, ScreenerParams, StockResult
+from core.models import NearMissResult, ScreenerParams, StockResult, TrackedStock
 from data_sources.base import (
     NewsSource,
     PriceDataSource,
@@ -27,6 +28,7 @@ from data_sources.base import (
     ShortInterestSource,
     UniverseSource,
 )
+from data_sources.github_storage import add_new_tracked_stocks
 from data_sources.news_source import YFinanceKeywordNewsSource
 from data_sources.price_source import PolygonPriceSource
 from data_sources.reverse_split_source import PolygonReverseSplitSource
@@ -41,8 +43,7 @@ logger = logging.getLogger(__name__)
 
 ProgressCallback = Callable[[int, int, str], None]
 
-# هامش "القرب من التأهل" لشرط الصعود بعد التقسيم
-_NEAR_MISS_RISE_MARGIN_PCT = 20.0  # مثلاً: حد 50% يصبح نطاق قرب حتى 70%
+_NEAR_MISS_RISE_MARGIN_PCT = 20.0
 
 
 class Screener:
@@ -67,7 +68,6 @@ class Screener:
         params: ScreenerParams,
         progress_callback: Optional[ProgressCallback] = None,
     ) -> Tuple[List[StockResult], List[NearMissResult]]:
-        # -------- المرحلة 1: الترشيح الأولي بالسعر/القيمة السوقية --------
         tickers = self.universe_source.get_tickers(TARGET_EXCHANGES)
 
         if progress_callback:
@@ -85,7 +85,6 @@ class Screener:
         if progress_callback:
             progress_callback(0, stage1_total, f"{stage1_total} tickers passed pre-filter")
 
-        # -------- المرحلة 2: فحص Reverse Split (Polygon) بالتوازي --------
         if progress_callback:
             progress_callback(0, stage1_total, "Checking Reverse Splits...")
 
@@ -129,7 +128,6 @@ class Screener:
         if total == 0:
             return [], []
 
-        # -------- المرحلة 3: جلب السعر التاريخي (Polygon) --------
         if progress_callback:
             progress_callback(0, total, "Fetching price data...")
 
@@ -137,7 +135,6 @@ class Screener:
             surviving_tickers, period=PRICE_HISTORY_PERIOD
         )
 
-        # -------- المرحلة 4: باقي التحليل + تصنيف القريبين من التأهل --------
         results: List[StockResult] = []
         near_misses: List[NearMissResult] = []
         rejection_reasons: Counter = Counter()
@@ -182,13 +179,40 @@ class Screener:
 
         results.sort(key=lambda r: r.score.total, reverse=True)
         near_misses.sort(key=lambda n: n.gap_description)
+
+        # -------- المرحلة 5: حفظ بسجل المتابعة الدائم --------
+        today = date.today()
+        tracked_new = [
+            TrackedStock(
+                ticker=r.ticker,
+                discovery_date=today,
+                discovery_price=r.price,
+                kind="result",
+                reason="passed",
+            )
+            for r in results
+        ] + [
+            TrackedStock(
+                ticker=n.ticker,
+                discovery_date=today,
+                discovery_price=n.price,
+                kind="near_miss",
+                reason=n.gap_description,
+            )
+            for n in near_misses
+        ]
+        if tracked_new:
+            try:
+                add_new_tracked_stocks(tracked_new)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("فشل حفظ سجل المتابعة: %s", exc)
+
         return results[: params.max_results], near_misses
 
     # ----------------------------------------------------------------
     def _check_post_split_rise(
         self, df, split_date: date, max_rise_pct: float
     ) -> Tuple[bool, float]:
-        """يرجع (نجح الشرط، نسبة الصعود الفعلية) للاستخدام بتصنيف القرب."""
         after_split = df[df.index.date >= split_date]
         if after_split.empty or len(after_split) < 2:
             return True, 0.0
@@ -240,7 +264,7 @@ class Screener:
         support_zone = detector.detect(
             df,
             tolerance_pct=params.support_tolerance_pct,
-            min_touches=max(2, params.min_touches - 1),  # نسمح بارتداد أقل للفحص هنا
+            min_touches=max(2, params.min_touches - 1),
             min_base_days=params.min_base_days,
         )
 
