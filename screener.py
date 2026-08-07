@@ -9,8 +9,8 @@ those layers knows about the other (Clean Architecture).
 1. الترشيح الأولي بالسعر/القيمة السوقية (NASDAQ Screener، مجاني وسريع)
 2. فحص Reverse Split (Polygon) على القائمة المصغّرة
 3. جلب السعر التاريخي (Polygon) فقط على الأسهم اللي عندها Reverse Split
-4. باقي التحليل (شامل فلتر عدد الأسهم القائمة الجديد)، مع تصنيف
-   الأسهم "القريبة من التأهل" في قائمة منفصلة
+4. باقي التحليل (شامل فلتر عدد الأسهم القائمة)، مع تصنيف الأسهم
+   "القريبة من التأهل" في قائمة منفصلة (تشمل الآن Short Float/Borrow Fee)
 5. حفظ كل النتائج (رئيسية + قريبة) بسجل المتابعة الدائم على GitHub
 """
 
@@ -240,7 +240,6 @@ class Screener:
         if last_price > params.max_price or last_price < params.min_price:
             return None, "price_out_of_range", None
 
-        # -------- فلتر جديد: عدد الأسهم القائمة (Shares Outstanding) --------
         shares_outstanding = get_shares_outstanding(ticker)
         if shares_outstanding is None:
             return None, "no_shares_outstanding_data", None
@@ -261,6 +260,7 @@ class Screener:
         if not rise_ok:
             near_miss_margin = params.max_post_split_rise_pct + _NEAR_MISS_RISE_MARGIN_PCT
             if rise_pct <= near_miss_margin:
+                short_interest = self.short_interest_source.get_short_interest(ticker)
                 near_miss = NearMissResult(
                     ticker=ticker,
                     price=last_price,
@@ -268,6 +268,8 @@ class Screener:
                         f"صعد {rise_pct:.1f}% بعد التقسيم (الحد المسموح "
                         f"{params.max_post_split_rise_pct:.0f}%)"
                     ),
+                    short_float_pct=short_interest.short_float_pct,
+                    borrow_fee_pct=short_interest.borrow_fee_pct,
                 )
                 return None, "post_split_rise_too_high", near_miss
             return None, "post_split_rise_too_high", None
@@ -284,6 +286,7 @@ class Screener:
             return None, "no_support_zone_found", None
 
         if support_zone.touches < params.min_touches:
+            short_interest = self.short_interest_source.get_short_interest(ticker)
             near_miss = NearMissResult(
                 ticker=ticker,
                 price=last_price,
@@ -291,6 +294,8 @@ class Screener:
                     f"عدد ارتدادات الدعم {support_zone.touches} فقط "
                     f"(المطلوب {params.min_touches})"
                 ),
+                short_float_pct=short_interest.short_float_pct,
+                borrow_fee_pct=short_interest.borrow_fee_pct,
             )
             return None, "not_enough_touches", near_miss
 
