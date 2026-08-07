@@ -133,6 +133,16 @@ with tab_scan:
             value=float(DEFAULT_MIN_DOLLAR_VOLUME),
             step=50_000.0,
         )
+
+        st.divider()
+        st.subheader("Shares outstanding (float size)")
+        min_shares_outstanding = st.number_input(
+            "Min shares outstanding", min_value=0.0, value=1_000_000.0, step=100_000.0
+        )
+        max_shares_outstanding = st.number_input(
+            "Max shares outstanding", min_value=0.0, value=1_500_000.0, step=100_000.0
+        )
+
         max_results = st.slider("Max results shown", 10, 100, 50, step=10)
 
         run_button = st.button("🚀 Run Scan", type="primary", use_container_width=True)
@@ -151,6 +161,8 @@ with tab_scan:
             min_price=min_price,
             max_market_cap=max_market_cap,
             min_dollar_volume=min_dollar_volume,
+            min_shares_outstanding=min_shares_outstanding,
+            max_shares_outstanding=max_shares_outstanding,
             max_results=max_results,
         )
 
