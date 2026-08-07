@@ -25,11 +25,9 @@ from config import (
     DEFAULT_MIN_DOLLAR_VOLUME,
     DEFAULT_MIN_TOUCHES,
     DEFAULT_REVERSE_SPLIT_LOOKBACK,
-    DEFAULT_SHORT_FLOAT_MIN,
     DEFAULT_SUPPORT_TOLERANCE_PCT,
     DISTANCE_FROM_SUPPORT_OPTIONS,
     REVERSE_SPLIT_LOOKBACK_OPTIONS,
-    SHORT_FLOAT_OPTIONS,
     TOUCHES_OPTIONS,
 )
 from core.models import ScreenerParams
@@ -98,17 +96,15 @@ with tab_scan:
 
         st.divider()
 
-        enable_short_float = st.checkbox("Enable Short Float filter", value=False)
-        min_short_float = None
+        enable_short_float = st.checkbox("Enable Short Float filter", value=True)
+        max_short_float = None
         if enable_short_float:
-            min_short_float = st.selectbox(
-                "Minimum Short Float (%)",
-                SHORT_FLOAT_OPTIONS,
-                index=SHORT_FLOAT_OPTIONS.index(DEFAULT_SHORT_FLOAT_MIN),
+            max_short_float = st.number_input(
+                "Maximum Short Float (%)", min_value=0.0, max_value=100.0, value=20.0, step=1.0
             )
             st.caption(
-                "Short Float data isn't freely available for every ticker in this "
-                "phase. The filter only applies to tickers where data is available."
+                "Excludes stocks with short float above this threshold, "
+                "per your mentor's rule (\"short less than 20%\")."
             )
 
         exclude_news = st.checkbox("Exclude stocks with impactful news", value=True)
@@ -137,10 +133,10 @@ with tab_scan:
         st.divider()
         st.subheader("Shares outstanding (float size)")
         min_shares_outstanding = st.number_input(
-            "Min shares outstanding", min_value=0.0, value=1_000_000.0, step=100_000.0
+            "Min shares outstanding", min_value=0.0, value=500_000.0, step=100_000.0
         )
         max_shares_outstanding = st.number_input(
-            "Max shares outstanding", min_value=0.0, value=1_900_000.0, step=100_000.0
+            "Max shares outstanding", min_value=0.0, value=3_000_000.0, step=100_000.0
         )
 
         max_results = st.slider("Max results shown", 10, 100, 50, step=10)
@@ -151,7 +147,7 @@ with tab_scan:
         params = ScreenerParams(
             reverse_split_lookback_days=reverse_split_lookback,
             max_post_split_rise_pct=max_post_split_rise,
-            min_short_float_pct=min_short_float,
+            max_short_float_pct=max_short_float,
             min_touches=min_touches,
             min_base_days=min_base_days,
             support_tolerance_pct=tolerance_pct,
