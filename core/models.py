@@ -18,7 +18,7 @@ class ScreenerParams:
     max_post_split_rise_pct: float = 20.0
     min_price_drop_pct: float = 40.0
     decline_window_days: int = 30
-    min_short_float_pct: Optional[float] = 15.0
+    max_short_float_pct: Optional[float] = 20.0
     min_touches: int = 2
     min_base_days: int = 20
     support_tolerance_pct: float = 4.0
@@ -28,8 +28,8 @@ class ScreenerParams:
     max_price: float = 10.00
     min_price: float = 1.0
     max_market_cap: float = 300_000_000
-    min_shares_outstanding: float = 1_000_000
-    max_shares_outstanding: float = 1_900_000
+    min_shares_outstanding: float = 500_000
+    max_shares_outstanding: float = 3_000_000
     min_dollar_volume: float = 300_000
     max_results: int = 50
 
