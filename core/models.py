@@ -139,13 +139,22 @@ class NearMissResult:
     ticker: str
     price: float
     gap_description: str
+    short_float_pct: Optional[float] = None
+    borrow_fee_pct: Optional[float] = None
 
     def to_row(self) -> dict:
         return {
             "Ticker": self.ticker,
             "Price": round(self.price, 3),
             "Why it's close": self.gap_description,
+            "Short Float %": (
+                round(self.short_float_pct, 2) if self.short_float_pct is not None else "N/A"
+            ),
+            "Borrow Fee %": (
+                round(self.borrow_fee_pct, 2) if self.borrow_fee_pct is not None else "N/A"
+            ),
         }
+
 
 
 @dataclass
