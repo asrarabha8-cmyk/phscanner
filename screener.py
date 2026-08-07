@@ -9,8 +9,8 @@ those layers knows about the other (Clean Architecture).
 1. الترشيح الأولي بالسعر/القيمة السوقية (NASDAQ Screener، مجاني وسريع)
 2. فحص Reverse Split (Polygon) على القائمة المصغّرة
 3. جلب السعر التاريخي (Polygon) فقط على الأسهم اللي عندها Reverse Split
-4. باقي التحليل (شامل فلتر عدد الأسهم القائمة)، مع تصنيف الأسهم
-   "القريبة من التأهل" في قائمة منفصلة (تشمل الآن Short Float/Borrow Fee)
+4. باقي التحليل (شامل فلتر عدد الأسهم القائمة وحد أقصى للـShort Float)،
+   مع تصنيف الأسهم "القريبة من التأهل" في قائمة منفصلة
 5. حفظ كل النتائج (رئيسية + قريبة) بسجل المتابعة الدائم على GitHub
 """
 
@@ -316,9 +316,9 @@ class Screener:
                 return None, "impactful_news", None
 
         short_interest = self.short_interest_source.get_short_interest(ticker)
-        if params.min_short_float_pct is not None and short_interest.short_float_pct is not None:
-            if short_interest.short_float_pct < params.min_short_float_pct:
-                return None, "low_short_float", None
+        if params.max_short_float_pct is not None and short_interest.short_float_pct is not None:
+            if short_interest.short_float_pct > params.max_short_float_pct:
+                return None, "high_short_float", None
 
         scorer = PhoenixScorer(tolerance_pct=params.support_tolerance_pct)
         score = scorer.score(reverse_split, support_zone, volume_profile)
