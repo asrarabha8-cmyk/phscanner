@@ -156,7 +156,6 @@ class NearMissResult:
         }
 
 
-
 @dataclass
 class TrackedStock:
     """سجل دائم لسهم اكتُشف بالسكانر -- يُستخدم لمتابعة أدائه بمرور الوقت."""
