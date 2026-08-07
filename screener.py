@@ -10,7 +10,8 @@ those layers knows about the other (Clean Architecture).
 2. فحص Reverse Split (Polygon) على القائمة المصغّرة
 3. جلب السعر التاريخي (Polygon) فقط على الأسهم اللي عندها Reverse Split
 4. باقي التحليل (شامل فلتر عدد الأسهم القائمة وحد أقصى للـShort Float)،
-   مع تصنيف الأسهم "القريبة من التأهل" في قائمة منفصلة
+   مع تصنيف الأسهم "القريبة من التأهل" في قائمة منفصلة -- الآن تشمل
+   ثلاثة أسباب: الصعود بعد التقسيم، عدد الارتدادات، وعدد الأسهم القائمة
 5. حفظ كل النتائج (رئيسية + قريبة) بسجل المتابعة الدائم على GitHub
 """
 
@@ -46,6 +47,7 @@ logger = logging.getLogger(__name__)
 ProgressCallback = Callable[[int, int, str], None]
 
 _NEAR_MISS_RISE_MARGIN_PCT = 20.0
+_NEAR_MISS_SHARES_MARGIN_RATIO = 0.25  # هامش 25% حول حدود نطاق الأسهم القائمة
 
 
 class Screener:
@@ -248,6 +250,22 @@ class Screener:
             <= shares_outstanding
             <= params.max_shares_outstanding
         ):
+            # نتحقق هل الفارق بسيط كفاية ليُعتبر near-miss
+            margin_low = params.min_shares_outstanding * (1 - _NEAR_MISS_SHARES_MARGIN_RATIO)
+            margin_high = params.max_shares_outstanding * (1 + _NEAR_MISS_SHARES_MARGIN_RATIO)
+            if margin_low <= shares_outstanding <= margin_high:
+                short_interest = self.short_interest_source.get_short_interest(ticker)
+                near_miss = NearMissResult(
+                    ticker=ticker,
+                    price=last_price,
+                    gap_description=(
+                        f"عدد الأسهم القائمة {shares_outstanding:,.0f} خارج النطاق "
+                        f"({params.min_shares_outstanding:,.0f} - {params.max_shares_outstanding:,.0f})"
+                    ),
+                    short_float_pct=short_interest.short_float_pct,
+                    borrow_fee_pct=short_interest.borrow_fee_pct,
+                )
+                return None, "shares_outstanding_out_of_range", near_miss
             return None, "shares_outstanding_out_of_range", None
 
         avg_dollar_volume = float((df["Close"] * df["Volume"]).tail(20).mean())
