@@ -18,6 +18,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from typing import Callable, List, Optional, Tuple
+from data_sources.shares_outstanding_source import get_shares_outstanding
 
 from config import PRICE_HISTORY_PERIOD, RVOL_AVERAGE_WINDOW, TARGET_EXCHANGES
 from core.models import NearMissResult, ScreenerParams, StockResult, TrackedStock
