@@ -147,7 +147,7 @@ with tab_scan:
 
         run_button = st.button("🚀 Run Scan", type="primary", use_container_width=True)
 
-    if run_button:
+        if run_button:
         params = ScreenerParams(
             reverse_split_lookback_days=reverse_split_lookback,
             max_post_split_rise_pct=max_post_split_rise,
@@ -168,6 +168,55 @@ with tab_scan:
 
         progress_bar = st.progress(0.0)
         status_text = st.empty()
+
+        def _on_progress(done: int, total: int, current: str):
+            ratio = 0.0 if total == 0 else min(done / total, 1.0)
+            progress_bar.progress(ratio)
+            status_text.text(f"Scanned {done}/{total} -- last ticker: {current}")
+
+        with st.spinner("Scanning... this can take several minutes depending on market size"):
+            screener = Screener()
+            results, near_misses = screener.run(params, progress_callback=_on_progress)
+
+        progress_bar.progress(1.0)
+        status_text.empty()
+
+        # نحفظ النتائج بذاكرة الجلسة عشان تبقى ظاهرة حتى لو انتقلت لتبويب ثاني ورجعت
+        st.session_state["last_results"] = results
+        st.session_state["last_near_misses"] = near_misses
+
+    # نعرض آخر نتيجة محفوظة بالجلسة (لو موجودة)، بغض النظر هل زر البحث انضغط بهذي اللحظة أو لأ
+    if "last_results" in st.session_state:
+        results = st.session_state["last_results"]
+        near_misses = st.session_state["last_near_misses"]
+
+        if not results:
+            st.warning("No matching stocks found. Try loosening the filters.")
+        else:
+            st.success(f"✅ Found {len(results)} matching stocks")
+            rows = [r.to_row() for r in results]
+            df_results = pd.DataFrame(rows)
+            st.dataframe(
+                df_results.sort_values("Phoenix Score", ascending=False),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        if near_misses:
+            st.divider()
+            st.subheader("🔎 Near-miss stocks (worth a manual look)")
+            st.caption(
+                "These stocks failed one filter by a small margin -- review them "
+                "yourself before deciding to skip."
+            )
+            near_rows = [n.to_row() for n in near_misses]
+            df_near = pd.DataFrame(near_rows)
+            st.dataframe(df_near, use_container_width=True, hide_index=True)
+
+        st.caption("📌 All discovered tickers were saved to the Tracked Stocks tab.")
+    else:
+        st.info("Set your criteria in the sidebar, then click \"Run Scan\".")
+
 
         def _on_progress(done: int, total: int, current: str):
             ratio = 0.0 if total == 0 else min(done / total, 1.0)
