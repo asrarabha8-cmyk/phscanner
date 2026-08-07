@@ -9,7 +9,8 @@ those layers knows about the other (Clean Architecture).
 1. الترشيح الأولي بالسعر/القيمة السوقية (NASDAQ Screener، مجاني وسريع)
 2. فحص Reverse Split (Polygon) على القائمة المصغّرة
 3. جلب السعر التاريخي (Polygon) فقط على الأسهم اللي عندها Reverse Split
-4. باقي التحليل، مع تصنيف الأسهم "القريبة من التأهل" في قائمة منفصلة
+4. باقي التحليل (شامل فلتر عدد الأسهم القائمة الجديد)، مع تصنيف
+   الأسهم "القريبة من التأهل" في قائمة منفصلة
 5. حفظ كل النتائج (رئيسية + قريبة) بسجل المتابعة الدائم على GitHub
 """
 
@@ -18,7 +19,6 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from typing import Callable, List, Optional, Tuple
-from data_sources.shares_outstanding_source import get_shares_outstanding
 
 from config import PRICE_HISTORY_PERIOD, RVOL_AVERAGE_WINDOW, TARGET_EXCHANGES
 from core.models import NearMissResult, ScreenerParams, StockResult, TrackedStock
@@ -33,6 +33,7 @@ from data_sources.github_storage import add_new_tracked_stocks
 from data_sources.news_source import YFinanceKeywordNewsSource
 from data_sources.price_source import PolygonPriceSource
 from data_sources.reverse_split_source import PolygonReverseSplitSource
+from data_sources.shares_outstanding_source import get_shares_outstanding
 from data_sources.short_interest_source import CompositeShortInterestSource
 from data_sources.universe_source import NasdaqTraderUniverseSource
 from data_sources.prefilter_source import get_prefiltered_tickers
@@ -181,7 +182,6 @@ class Screener:
         results.sort(key=lambda r: r.score.total, reverse=True)
         near_misses.sort(key=lambda n: n.gap_description)
 
-        # -------- المرحلة 5: حفظ بسجل المتابعة الدائم --------
         today = date.today()
         tracked_new = [
             TrackedStock(
@@ -239,6 +239,17 @@ class Screener:
         last_price = float(df["Close"].iloc[-1])
         if last_price > params.max_price or last_price < params.min_price:
             return None, "price_out_of_range", None
+
+        # -------- فلتر جديد: عدد الأسهم القائمة (Shares Outstanding) --------
+        shares_outstanding = get_shares_outstanding(ticker)
+        if shares_outstanding is None:
+            return None, "no_shares_outstanding_data", None
+        if not (
+            params.min_shares_outstanding
+            <= shares_outstanding
+            <= params.max_shares_outstanding
+        ):
+            return None, "shares_outstanding_out_of_range", None
 
         avg_dollar_volume = float((df["Close"] * df["Volume"]).tail(20).mean())
         if avg_dollar_volume < params.min_dollar_volume:
