@@ -253,7 +253,50 @@ with tab_tracked:
             else:
                 st.error("Failed to save updated prices. Check logs.")
 
+        # -------- تصنيف كل سهم حسب "فئة" سبب الرفض (للتحليل الإحصائي) --------
+        def _reason_category(reason: str) -> str:
+            if reason == "passed":
+                return "Passed all filters"
+            if "صعد" in reason and "بعد التقسيم" in reason:
+                return "Post-split rise too high"
+            if "ارتدادات الدعم" in reason:
+                return "Not enough support touches"
+            if "الأسهم القائمة" in reason:
+                return "Shares outstanding out of range"
+            return "Other"
+
+        # -------- ملخص متوسط الأداء لكل فئة (بس للأسهم اللي عندها سعر محدّث) --------
+        checked = [s for s in tracked if s.change_pct is not None]
+        if checked:
+            st.subheader("📈 Average performance by rejection reason")
+            summary_rows = {}
+            for s in checked:
+                cat = _reason_category(s.reason)
+                summary_rows.setdefault(cat, []).append(s.change_pct)
+
+            summary_data = [
+                {
+                    "Category": cat,
+                    "Count": len(changes),
+                    "Avg Change %": round(sum(changes) / len(changes), 2),
+                    "Best %": round(max(changes), 2),
+                    "Worst %": round(min(changes), 2),
+                }
+                for cat, changes in summary_rows.items()
+            ]
+            df_summary = pd.DataFrame(summary_data).sort_values(
+                "Avg Change %", ascending=False
+            )
+            st.dataframe(df_summary, use_container_width=True, hide_index=True)
+            st.divider()
+
+        # -------- الجدول الكامل، مرتب تلقائيًا حسب الأداء (الأعلى ربحًا أولًا) --------
         rows = [s.to_row() for s in tracked]
         df_tracked = pd.DataFrame(rows)
-        df_tracked = df_tracked.sort_values("Discovery Date", ascending=False)
+
+        def _sort_key(val):
+            return val if isinstance(val, (int, float)) else float("-inf")
+
+        df_tracked["_sort"] = df_tracked["Change %"].apply(_sort_key)
+        df_tracked = df_tracked.sort_values("_sort", ascending=False).drop(columns=["_sort"])
         st.dataframe(df_tracked, use_container_width=True, hide_index=True)
