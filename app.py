@@ -265,12 +265,19 @@ with tab_tracked:
                 return "Shares outstanding out of range"
             return "Other"
 
-        # -------- ملخص متوسط الأداء لكل فئة (بس للأسهم اللي عندها سعر محدّث) --------
+        # -------- ملخص متوسط الأداء لكل فئة -- برمز فريد مرة وحدة (أحدث اكتشاف) --------
         checked = [s for s in tracked if s.change_pct is not None]
         if checked:
-            st.subheader("📈 Average performance by rejection reason")
-            summary_rows = {}
+            latest_per_ticker = {}
             for s in checked:
+                existing = latest_per_ticker.get(s.ticker)
+                if existing is None or s.discovery_date > existing.discovery_date:
+                    latest_per_ticker[s.ticker] = s
+
+            st.subheader("📈 Average performance by rejection reason")
+            st.caption("Each ticker counted once (most recent discovery).")
+            summary_rows = {}
+            for s in latest_per_ticker.values():
                 cat = _reason_category(s.reason)
                 summary_rows.setdefault(cat, []).append(s.change_pct)
 
