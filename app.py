@@ -64,7 +64,7 @@ with tab_scan:
             "Max rise right after split (%)",
             min_value=10,
             max_value=200,
-            value=50,
+            value=150,
             step=10,
         )
 
