@@ -63,9 +63,9 @@ with tab_scan:
         max_post_split_rise = st.slider(
             "Max rise right after split (%)",
             min_value=10,
-            max_value=200,
-            value=150,
-            step=10,
+            max_value=500,
+            value=300,
+            step=20,
         )
 
         min_touches = st.selectbox(
