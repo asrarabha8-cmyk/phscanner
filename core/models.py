@@ -15,7 +15,7 @@ class ScreenerParams:
     """كل المعايير القابلة للتحكم من واجهة المستخدم."""
 
     reverse_split_lookback_days: int = 90
-    max_post_split_rise_pct: float = 20.0
+    max_post_split_rise_pct: float = 150.0
     min_price_drop_pct: float = 40.0
     decline_window_days: int = 30
     max_short_float_pct: Optional[float] = 20.0
@@ -102,6 +102,7 @@ class StockResult:
     volume_profile: VolumeProfile
     short_interest: ShortInterestInfo
     score: ScoreBreakdown
+    rsi: Optional[float] = None
 
     def to_row(self) -> dict:
         return {
@@ -128,6 +129,7 @@ class StockResult:
                 if self.short_interest.borrow_fee_pct is not None
                 else "N/A"
             ),
+            "RSI": round(self.rsi, 1) if self.rsi is not None else "N/A",
             "RVOL": round(self.volume_profile.relative_volume, 2),
             "Reverse Split Date": self.reverse_split.split_date.isoformat(),
             "Phoenix Score": round(self.score.total, 1),
@@ -141,6 +143,7 @@ class NearMissResult:
     gap_description: str
     short_float_pct: Optional[float] = None
     borrow_fee_pct: Optional[float] = None
+    rsi: Optional[float] = None
 
     def to_row(self) -> dict:
         return {
@@ -153,12 +156,13 @@ class NearMissResult:
             "Borrow Fee %": (
                 round(self.borrow_fee_pct, 2) if self.borrow_fee_pct is not None else "N/A"
             ),
+            "RSI": round(self.rsi, 1) if self.rsi is not None else "N/A",
         }
 
 
 @dataclass
 class TrackedStock:
-    """سجل دائم لسهم اكتُشف بالسكانر -- يُستخدم لمتابعة أدائه بمرور الوقت."""
+    """سجل دائم لسهم اكتُشف بالسكانر -- يستخدم لمتابعة أدائه بمرور الوقت."""
 
     ticker: str
     discovery_date: date
