@@ -8,10 +8,10 @@ those layers knows about the other (Clean Architecture).
 ترتيب المراحل (بعد الاشتراك بـ Polygon Stocks Starter -- طلبات غير محدودة):
 1. الترشيح الأولي بالسعر/القيمة السوقية (NASDAQ Screener، مجاني وسريع)
 2. فحص Reverse Split (Polygon) على القائمة المصغّرة
-3. جلب السعر التاريخي (Polygon) فقط على الأسهم اللي عندها Reverse Split
-4. باقي التحليل (شامل فلتر عدد الأسهم القائمة وحد أقصى للـShort Float)،
-   مع تصنيف الأسهم "القريبة من التأهل" في قائمة منفصلة -- الآن تشمل
-   ثلاثة أسباب: الصعود بعد التقسيم، عدد الارتدادات، وعدد الأسهم القائمة
+3. جلب السعر التاريخي (Polygon، وقت السوق الرسمي فقط) فقط على الأسهم
+   اللي عندها Reverse Split
+4. باقي التحليل (شامل فلتر عدد الأسهم القائمة، RSI كمؤشر تأكيد إضافي)،
+   مع تصنيف الأسهم "القريبة من التأهل" في قائمة منفصلة
 5. حفظ كل النتائج (رئيسية + قريبة) بسجل المتابعة الدائم على GitHub
 """
 
@@ -40,6 +40,7 @@ from data_sources.universe_source import NasdaqTraderUniverseSource
 from data_sources.prefilter_source import get_prefiltered_tickers
 from analysis.support_detector import SupportDetector
 from analysis.volume_analyzer import VolumeAnalyzer
+from analysis.rsi_calculator import calculate_rsi
 from analysis.scorer import PhoenixScorer
 
 logger = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ logger = logging.getLogger(__name__)
 ProgressCallback = Callable[[int, int, str], None]
 
 _NEAR_MISS_RISE_MARGIN_PCT = 20.0
-_NEAR_MISS_SHARES_MARGIN_RATIO = 0.25  # هامش 25% حول حدود نطاق الأسهم القائمة
+_NEAR_MISS_SHARES_MARGIN_RATIO = 0.25
 
 
 class Screener:
@@ -242,6 +243,8 @@ class Screener:
         if last_price > params.max_price or last_price < params.min_price:
             return None, "price_out_of_range", None
 
+        rsi = calculate_rsi(df)
+
         shares_outstanding = get_shares_outstanding(ticker)
         if shares_outstanding is None:
             return None, "no_shares_outstanding_data", None
@@ -250,7 +253,6 @@ class Screener:
             <= shares_outstanding
             <= params.max_shares_outstanding
         ):
-            # نتحقق هل الفارق بسيط كفاية ليُعتبر near-miss
             margin_low = params.min_shares_outstanding * (1 - _NEAR_MISS_SHARES_MARGIN_RATIO)
             margin_high = params.max_shares_outstanding * (1 + _NEAR_MISS_SHARES_MARGIN_RATIO)
             if margin_low <= shares_outstanding <= margin_high:
@@ -264,6 +266,7 @@ class Screener:
                     ),
                     short_float_pct=short_interest.short_float_pct,
                     borrow_fee_pct=short_interest.borrow_fee_pct,
+                    rsi=rsi,
                 )
                 return None, "shares_outstanding_out_of_range", near_miss
             return None, "shares_outstanding_out_of_range", None
@@ -288,6 +291,7 @@ class Screener:
                     ),
                     short_float_pct=short_interest.short_float_pct,
                     borrow_fee_pct=short_interest.borrow_fee_pct,
+                    rsi=rsi,
                 )
                 return None, "post_split_rise_too_high", near_miss
             return None, "post_split_rise_too_high", None
@@ -314,6 +318,7 @@ class Screener:
                 ),
                 short_float_pct=short_interest.short_float_pct,
                 borrow_fee_pct=short_interest.borrow_fee_pct,
+                rsi=rsi,
             )
             return None, "not_enough_touches", near_miss
 
@@ -350,5 +355,6 @@ class Screener:
             volume_profile=volume_profile,
             short_interest=short_interest,
             score=score,
+            rsi=rsi,
         )
         return result, "passed", None
