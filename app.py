@@ -28,18 +28,22 @@ from config import (
     DEFAULT_SUPPORT_TOLERANCE_PCT,
     DISTANCE_FROM_SUPPORT_OPTIONS,
     REVERSE_SPLIT_LOOKBACK_OPTIONS,
+    PRICE_HISTORY_PERIOD,
     TOUCHES_OPTIONS,
 )
 from core.models import ScreenerParams
 from data_sources.github_storage import read_tracked_stocks, write_tracked_stocks
 from data_sources.price_source import PolygonPriceSource
+from data_sources.reverse_split_source import PolygonReverseSplitSource
 from screener import Screener
 
 logging.basicConfig(level=logging.WARNING)
 
 st.set_page_config(page_title="Phoenix Scanner", layout="wide")
 
-tab_scan, tab_tracked = st.tabs(["🔥 Scanner", "📊 Tracked Stocks"])
+tab_scan, tab_tracked, tab_search = st.tabs(
+    ["🔥 Scanner", "📊 Tracked Stocks", "🔍 Search"]
+)
 
 # ========================================================================
 # التبويب الأول: السكانر
@@ -64,8 +68,8 @@ with tab_scan:
             "Max rise right after split (%)",
             min_value=10,
             max_value=500,
-            value=300,
-            step=20,
+            value=150,
+            step=10,
         )
 
         min_touches = st.selectbox(
@@ -161,6 +165,7 @@ with tab_scan:
             max_shares_outstanding=max_shares_outstanding,
             max_results=max_results,
         )
+        st.session_state["last_params"] = params
 
         progress_bar = st.progress(0.0)
         status_text = st.empty()
@@ -253,7 +258,6 @@ with tab_tracked:
             else:
                 st.error("Failed to save updated prices. Check logs.")
 
-        # -------- تصنيف كل سهم حسب "فئة" سبب الرفض (للتحليل الإحصائي) --------
         def _reason_category(reason: str) -> str:
             if reason == "passed":
                 return "Passed all filters"
@@ -265,7 +269,6 @@ with tab_tracked:
                 return "Shares outstanding out of range"
             return "Other"
 
-        # -------- ملخص متوسط الأداء لكل فئة -- برمز فريد مرة وحدة (أحدث اكتشاف) --------
         checked = [s for s in tracked if s.change_pct is not None]
         if checked:
             latest_per_ticker = {}
@@ -297,7 +300,6 @@ with tab_tracked:
             st.dataframe(df_summary, use_container_width=True, hide_index=True)
             st.divider()
 
-        # -------- الجدول الكامل، مرتب تلقائيًا حسب الأداء (الأعلى ربحًا أولًا) --------
         rows = [s.to_row() for s in tracked]
         df_tracked = pd.DataFrame(rows)
 
@@ -307,3 +309,71 @@ with tab_tracked:
         df_tracked["_sort"] = df_tracked["Change %"].apply(_sort_key)
         df_tracked = df_tracked.sort_values("_sort", ascending=False).drop(columns=["_sort"])
         st.dataframe(df_tracked, use_container_width=True, hide_index=True)
+
+# ========================================================================
+# التبويب الثالث: البحث عن سهم معيّن
+# ========================================================================
+with tab_search:
+    st.title("🔍 Search a Stock")
+    st.caption(
+        "Check any ticker against the exact same rules used by the scanner -- "
+        "see which conditions it passes or fails."
+    )
+
+    search_ticker = st.text_input("Ticker symbol", placeholder="e.g. SILO").strip().upper()
+    search_button = st.button("🔎 Check this stock", type="primary")
+
+    if search_button and search_ticker:
+        params = st.session_state.get("last_params") or ScreenerParams()
+
+        with st.spinner(f"Checking {search_ticker}..."):
+            price_source = PolygonPriceSource()
+            reverse_split_source = PolygonReverseSplitSource()
+
+            df = price_source.get_history(search_ticker, period=PRICE_HISTORY_PERIOD)
+            reverse_split = reverse_split_source.get_recent_reverse_splits(
+                search_ticker, params.reverse_split_lookback_days, date.today()
+            )
+
+            screener = Screener(
+                price_source=price_source, reverse_split_source=reverse_split_source
+            )
+            result, reason, near_miss = screener._process_ticker(
+                search_ticker, params, df, reverse_split
+            )
+
+        if result is not None:
+            st.success(f"✅ {search_ticker} passes all filters!")
+            df_row = pd.DataFrame([result.to_row()])
+            st.dataframe(df_row, use_container_width=True, hide_index=True)
+        elif near_miss is not None:
+            st.warning(f"🔎 {search_ticker} is close, but didn't fully qualify.")
+            df_row = pd.DataFrame([near_miss.to_row()])
+            st.dataframe(df_row, use_container_width=True, hide_index=True)
+        else:
+            reason_labels = {
+                "no_price_data": "No price data available for this ticker.",
+                "no_reverse_split": (
+                    f"No reverse split found within the last "
+                    f"{params.reverse_split_lookback_days} days."
+                ),
+                "price_out_of_range": (
+                    f"Price is outside the ${params.min_price}-${params.max_price} range."
+                ),
+                "no_shares_outstanding_data": "No shares outstanding data available.",
+                "shares_outstanding_out_of_range": "Shares outstanding is outside the configured range.",
+                "low_dollar_volume": "Daily dollar volume is below the minimum threshold.",
+                "post_split_rise_too_high": "Rose too much right after the split.",
+                "no_support_zone_found": "No valid support zone could be detected.",
+                "not_enough_touches": "Not enough support touches.",
+                "support_zone_broken": "The support zone has been broken (closed below it).",
+                "too_far_from_support": "Current price is too far from the support zone.",
+                "impactful_news": "Impactful negative news was found recently.",
+                "high_short_float": "Short float is above the maximum threshold.",
+            }
+            st.error(
+                f"❌ {search_ticker} did not qualify: "
+                f"{reason_labels.get(reason, reason)}"
+            )
+    elif search_button and not search_ticker:
+        st.warning("Please enter a ticker symbol.")
