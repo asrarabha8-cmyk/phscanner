@@ -67,8 +67,20 @@ class NewsCheckResult:
 @dataclass
 class ShortInterestInfo:
     short_float_pct: Optional[float] = None
+    short_interest_shares: Optional[float] = None
     borrow_fee_pct: Optional[float] = None
     available: bool = False
+
+
+def _short_interest_label(shares: Optional[float]) -> str:
+    """تصنيف سريع حسب منهجية المعلم: قليل (<10 آلاف) / عالٍ (>=50 ألف)."""
+    if shares is None:
+        return "N/A"
+    if shares < 10_000:
+        return "🟢 قليل"
+    if shares >= 50_000:
+        return "🔴 عالٍ"
+    return "🟡 متوسط"
 
 
 @dataclass
@@ -124,6 +136,12 @@ class StockResult:
                 if self.short_interest.short_float_pct is not None
                 else "N/A"
             ),
+            "Short Interest (shares)": (
+                f"{self.short_interest.short_interest_shares:,.0f}"
+                if self.short_interest.short_interest_shares is not None
+                else "N/A"
+            ),
+            "Short Level": _short_interest_label(self.short_interest.short_interest_shares),
             "Borrow Fee %": (
                 round(self.short_interest.borrow_fee_pct, 2)
                 if self.short_interest.borrow_fee_pct is not None
@@ -142,6 +160,7 @@ class NearMissResult:
     price: float
     gap_description: str
     short_float_pct: Optional[float] = None
+    short_interest_shares: Optional[float] = None
     borrow_fee_pct: Optional[float] = None
     rsi: Optional[float] = None
 
@@ -153,6 +172,12 @@ class NearMissResult:
             "Short Float %": (
                 round(self.short_float_pct, 2) if self.short_float_pct is not None else "N/A"
             ),
+            "Short Interest (shares)": (
+                f"{self.short_interest_shares:,.0f}"
+                if self.short_interest_shares is not None
+                else "N/A"
+            ),
+            "Short Level": _short_interest_label(self.short_interest_shares),
             "Borrow Fee %": (
                 round(self.borrow_fee_pct, 2) if self.borrow_fee_pct is not None else "N/A"
             ),
@@ -162,7 +187,7 @@ class NearMissResult:
 
 @dataclass
 class TrackedStock:
-    """سجل دائم لسهم اكتُشف بالسكانر -- يستخدم لمتابعة أدائه بمرور الوقت."""
+    """سجل دائم لسهم اكتُشف بالسكانر -- يُستخدم لمتابعة أدائه بمرور الوقت."""
 
     ticker: str
     discovery_date: date
