@@ -10,8 +10,9 @@ those layers knows about the other (Clean Architecture).
 2. فحص Reverse Split (Polygon) على القائمة المصغّرة
 3. جلب السعر التاريخي (Polygon، وقت السوق الرسمي فقط) فقط على الأسهم
    اللي عندها Reverse Split
-4. باقي التحليل (شامل فلتر عدد الأسهم القائمة، RSI كمؤشر تأكيد إضافي)،
-   مع تصنيف الأسهم "القريبة من التأهل" في قائمة منفصلة
+4. باقي التحليل (شامل فلتر عدد الأسهم القائمة، RSI والشورت الخام
+   كمؤشرات تأكيد إضافية)، مع تصنيف الأسهم "القريبة من التأهل" في
+   قائمة منفصلة
 5. حفظ كل النتائج (رئيسية + قريبة) بسجل المتابعة الدائم على GitHub
 """
 
@@ -265,6 +266,7 @@ class Screener:
                         f"({params.min_shares_outstanding:,.0f} - {params.max_shares_outstanding:,.0f})"
                     ),
                     short_float_pct=short_interest.short_float_pct,
+                    short_interest_shares=short_interest.short_interest_shares,
                     borrow_fee_pct=short_interest.borrow_fee_pct,
                     rsi=rsi,
                 )
@@ -290,6 +292,7 @@ class Screener:
                         f"{params.max_post_split_rise_pct:.0f}%)"
                     ),
                     short_float_pct=short_interest.short_float_pct,
+                    short_interest_shares=short_interest.short_interest_shares,
                     borrow_fee_pct=short_interest.borrow_fee_pct,
                     rsi=rsi,
                 )
@@ -317,6 +320,7 @@ class Screener:
                     f"(المطلوب {params.min_touches})"
                 ),
                 short_float_pct=short_interest.short_float_pct,
+                short_interest_shares=short_interest.short_interest_shares,
                 borrow_fee_pct=short_interest.borrow_fee_pct,
                 rsi=rsi,
             )
