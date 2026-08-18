@@ -32,8 +32,11 @@ DEFAULT_SHORT_FLOAT_MIN = 15
 TOUCHES_OPTIONS = [3, 4, 5]
 DEFAULT_MIN_TOUCHES = 3
 
-BASE_DAYS_OPTIONS = [10, 20, 40, 60]
-DEFAULT_MIN_BASE_DAYS = 20
+# تم تخفيض الحد الأدنى بناءً على ملاحظة عملية: أغلب الأسهم تثبت 4-9
+# جلسات قبل الارتداد الثاني، وهذا يطابق منهجية المعلم (7-10 أيام ثبات
+# بدون كسر القاع). أُبقي 20/40/60 كخيارات لمن يريد قاعدة أطول وأكثر تحفظًا.
+BASE_DAYS_OPTIONS = [7, 10, 20, 40, 60]
+DEFAULT_MIN_BASE_DAYS = 7
 
 DISTANCE_FROM_SUPPORT_OPTIONS = [2, 3, 5]
 DEFAULT_MAX_DISTANCE_FROM_SUPPORT = 5.0
