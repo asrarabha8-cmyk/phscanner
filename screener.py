@@ -5,7 +5,12 @@ Main orchestrator. This is the only layer that knows about both the
 data_sources and analysis layers and wires them together; neither of
 those layers knows about the other (Clean Architecture).
 
-ترتيب المراحل (بعد الاشتراك بـ Polygon Stocks Starter -- طلبات غير محدودة):
+تحديث مهم: بناءً على تحليل بيانات فعلية على 3+ أسابيع، الصعود القوي بعد
+التقسيم لم يعد سبب استبعاد -- أصبح عامل تعزيز إيجابي بالـScore. يبقى فقط
+سقف أمان (sanity ceiling) لاستبعاد الحالات الشاذة جدًا (احتيال محتمل أو
+خطأ بيانات)، لا فلترة حقيقية.
+
+ترتيب المراحل:
 1. الترشيح الأولي بالسعر/القيمة السوقية (NASDAQ Screener، مجاني وسريع)
 2. فحص Reverse Split (Polygon) على القائمة المصغّرة
 3. جلب السعر التاريخي (Polygon، وقت السوق الرسمي فقط) فقط على الأسهم
@@ -48,8 +53,9 @@ logger = logging.getLogger(__name__)
 
 ProgressCallback = Callable[[int, int, str], None]
 
-_NEAR_MISS_RISE_MARGIN_PCT = 20.0
 _NEAR_MISS_SHARES_MARGIN_RATIO = 0.25
+# سقف أمان فقط (مو فلتر حقيقي) -- يستبعد فقط الحالات الشاذة جدًا
+_SANITY_CEILING_RISE_PCT = 1000.0
 
 
 class Screener:
@@ -215,21 +221,18 @@ class Screener:
         return results[: params.max_results], near_misses
 
     # ----------------------------------------------------------------
-    def _check_post_split_rise(
-        self, df, split_date: date, max_rise_pct: float
-    ) -> Tuple[bool, float]:
+    def _calc_post_split_rise(self, df, split_date: date) -> float:
+        """يرجع نسبة الصعود فقط، بدون أي حكم قبول/رفض."""
         after_split = df[df.index.date >= split_date]
         if after_split.empty or len(after_split) < 2:
-            return True, 0.0
+            return 0.0
 
         first_close = float(after_split["Close"].iloc[0])
         if first_close <= 0:
-            return True, 0.0
+            return 0.0
 
         highest_after = float(after_split["High"].max())
-        rise_pct = (highest_after - first_close) / first_close * 100
-
-        return rise_pct <= max_rise_pct, rise_pct
+        return (highest_after - first_close) / first_close * 100
 
     # ----------------------------------------------------------------
     def _process_ticker(
@@ -277,27 +280,10 @@ class Screener:
         if avg_dollar_volume < params.min_dollar_volume:
             return None, "low_dollar_volume", None
 
-        rise_ok, rise_pct = self._check_post_split_rise(
-            df, reverse_split.split_date, params.max_post_split_rise_pct
-        )
-        if not rise_ok:
-            near_miss_margin = params.max_post_split_rise_pct + _NEAR_MISS_RISE_MARGIN_PCT
-            if rise_pct <= near_miss_margin:
-                short_interest = self.short_interest_source.get_short_interest(ticker)
-                near_miss = NearMissResult(
-                    ticker=ticker,
-                    price=last_price,
-                    gap_description=(
-                        f"صعد {rise_pct:.1f}% بعد التقسيم (الحد المسموح "
-                        f"{params.max_post_split_rise_pct:.0f}%)"
-                    ),
-                    short_float_pct=short_interest.short_float_pct,
-                    short_interest_shares=short_interest.short_interest_shares,
-                    borrow_fee_pct=short_interest.borrow_fee_pct,
-                    rsi=rsi,
-                )
-                return None, "post_split_rise_too_high", near_miss
-            return None, "post_split_rise_too_high", None
+        # -------- الصعود بعد التقسيم: يُحسب فقط، سقف أمان للحالات الشاذة جدًا --------
+        rise_pct = self._calc_post_split_rise(df, reverse_split.split_date)
+        if rise_pct > _SANITY_CEILING_RISE_PCT:
+            return None, "extreme_rise_sanity_check", None
 
         detector = SupportDetector()
         support_zone = detector.detect(
@@ -348,7 +334,7 @@ class Screener:
                 return None, "high_short_float", None
 
         scorer = PhoenixScorer(tolerance_pct=params.support_tolerance_pct)
-        score = scorer.score(reverse_split, support_zone, volume_profile)
+        score = scorer.score(reverse_split, support_zone, volume_profile, rise_pct)
 
         result = StockResult(
             ticker=ticker,
@@ -360,5 +346,6 @@ class Screener:
             short_interest=short_interest,
             score=score,
             rsi=rsi,
+            post_split_rise_pct=rise_pct,
         )
         return result, "passed", None
