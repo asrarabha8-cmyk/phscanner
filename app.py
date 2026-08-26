@@ -64,12 +64,17 @@ with tab_scan:
             index=REVERSE_SPLIT_LOOKBACK_OPTIONS.index(DEFAULT_REVERSE_SPLIT_LOOKBACK),
         )
 
-        max_post_split_rise = st.slider(
-            "Max rise right after split (%)",
-            min_value=10,
-            max_value=500,
-            value=150,
-            step=10,
+        st.caption(
+            "ℹ️ Post-split rise is no longer a rejection filter -- it's now a "
+            "positive score factor (based on 3+ weeks of tracked data). Only an "
+            "extreme sanity ceiling remains below."
+        )
+        max_post_split_rise = st.number_input(
+            "Sanity ceiling for post-split rise (%)",
+            min_value=200,
+            max_value=5000,
+            value=1000,
+            step=100,
         )
 
         min_touches = st.selectbox(
@@ -137,10 +142,10 @@ with tab_scan:
         st.divider()
         st.subheader("Shares outstanding (float size)")
         min_shares_outstanding = st.number_input(
-            "Min shares outstanding", min_value=0.0, value=500_000.0, step=100_000.0
+            "Min shares outstanding", min_value=0.0, value=200_000.0, step=100_000.0
         )
         max_shares_outstanding = st.number_input(
-            "Max shares outstanding", min_value=0.0, value=3_000_000.0, step=100_000.0
+            "Max shares outstanding", min_value=0.0, value=8_000_000.0, step=100_000.0
         )
 
         max_results = st.slider("Max results shown", 10, 100, 50, step=10)
@@ -150,7 +155,7 @@ with tab_scan:
     if run_button:
         params = ScreenerParams(
             reverse_split_lookback_days=reverse_split_lookback,
-            max_post_split_rise_pct=max_post_split_rise,
+            max_post_split_rise_pct=float(max_post_split_rise),
             max_short_float_pct=max_short_float,
             min_touches=min_touches,
             min_base_days=min_base_days,
@@ -363,7 +368,7 @@ with tab_search:
                 "no_shares_outstanding_data": "No shares outstanding data available.",
                 "shares_outstanding_out_of_range": "Shares outstanding is outside the configured range.",
                 "low_dollar_volume": "Daily dollar volume is below the minimum threshold.",
-                "post_split_rise_too_high": "Rose too much right after the split.",
+                "extreme_rise_sanity_check": "Rise after split is extreme -- flagged for manual review.",
                 "no_support_zone_found": "No valid support zone could be detected.",
                 "not_enough_touches": "Not enough support touches.",
                 "support_zone_broken": "The support zone has been broken (closed below it).",
