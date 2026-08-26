@@ -15,12 +15,12 @@ class ScreenerParams:
     """كل المعايير القابلة للتحكم من واجهة المستخدم."""
 
     reverse_split_lookback_days: int = 90
-    max_post_split_rise_pct: float = 150.0
+    max_post_split_rise_pct: float = 1000.0  # سقف أمان فقط، مو فلتر حقيقي
     min_price_drop_pct: float = 40.0
     decline_window_days: int = 30
     max_short_float_pct: Optional[float] = 20.0
     min_touches: int = 2
-    min_base_days: int = 20
+    min_base_days: int = 7
     support_tolerance_pct: float = 4.0
     max_distance_from_support_pct: float = 8.0
     exclude_impactful_news: bool = True
@@ -28,8 +28,8 @@ class ScreenerParams:
     max_price: float = 10.00
     min_price: float = 1.0
     max_market_cap: float = 300_000_000
-    min_shares_outstanding: float = 500_000
-    max_shares_outstanding: float = 3_000_000
+    min_shares_outstanding: float = 200_000
+    max_shares_outstanding: float = 8_000_000
     min_dollar_volume: float = 300_000
     max_results: int = 50
 
@@ -73,7 +73,6 @@ class ShortInterestInfo:
 
 
 def _short_interest_label(shares: Optional[float]) -> str:
-    """تصنيف سريع حسب منهجية المعلم: قليل (<10 آلاف) / عالٍ (>=50 ألف)."""
     if shares is None:
         return "N/A"
     if shares < 10_000:
@@ -115,6 +114,7 @@ class StockResult:
     short_interest: ShortInterestInfo
     score: ScoreBreakdown
     rsi: Optional[float] = None
+    post_split_rise_pct: float = 0.0
 
     def to_row(self) -> dict:
         return {
@@ -131,6 +131,7 @@ class StockResult:
                 2,
             ),
             "Distance From Support %": round(self.distance_from_support_pct, 2),
+            "Post-Split Rise %": round(self.post_split_rise_pct, 1),
             "Short Float %": (
                 round(self.short_interest.short_float_pct, 2)
                 if self.short_interest.short_float_pct is not None
