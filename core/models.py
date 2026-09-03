@@ -75,7 +75,7 @@ class ShortInterestInfo:
 def _short_interest_label(shares: Optional[float]) -> str:
     if shares is None:
         return "N/A"
-    if shares < 10_000:
+    if shares < 15_000:
         return "🟢 قليل"
     if shares >= 50_000:
         return "🔴 عالٍ"
