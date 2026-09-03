@@ -22,14 +22,12 @@ DEFAULT_REVERSE_SPLIT_LOOKBACK = 90
 SHORT_FLOAT_OPTIONS = [15, 20, 25]
 DEFAULT_SHORT_FLOAT_MIN = 15
 
-# تم تخفيض الحد الأدنى بناءً على تحليل بيانات فعلية على 3+ أسابيع:
-# أسهم اجتازت الدعم بلمستين فقط (2) كان أداؤها أقوى بالمتوسط من الأسهم
-# التي اشترطنا لها 3 لمسات -- التأكيد السريع للدعم إشارة قوة، مو ضعف.
 TOUCHES_OPTIONS = [2, 3, 4, 5]
 DEFAULT_MIN_TOUCHES = 2
 
-BASE_DAYS_OPTIONS = [7, 10, 20, 40, 60]
-DEFAULT_MIN_BASE_DAYS = 7
+# تم التعديل لمطابقة كلام المعلم بالضبط: "ثبات فوق الدعم 4 جلسات"
+BASE_DAYS_OPTIONS = [4, 7, 10, 20, 40, 60]
+DEFAULT_MIN_BASE_DAYS = 4
 
 DISTANCE_FROM_SUPPORT_OPTIONS = [2, 3, 5]
 DEFAULT_MAX_DISTANCE_FROM_SUPPORT = 5.0
