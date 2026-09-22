@@ -164,6 +164,12 @@ class NearMissResult:
     short_interest_shares: Optional[float] = None
     borrow_fee_pct: Optional[float] = None
     rsi: Optional[float] = None
+    # الحقول التالية متاحة فقط لما يكون سبب الاستبعاد "عدد ارتدادات الدعم"
+    # (يعني وصلنا لمرحلة كشف الدعم فعلاً) -- غير متاحة لحالات "الأسهم القائمة"
+    touches: Optional[int] = None
+    base_days: Optional[int] = None
+    post_split_rise_pct: Optional[float] = None
+    stop_loss: Optional[float] = None
 
     def to_row(self) -> dict:
         return {
@@ -197,6 +203,14 @@ class TrackedStock:
     reason: str
     last_checked_date: Optional[date] = None
     last_price: Optional[float] = None
+    # خصائص السهم وقت الاكتشاف -- تُستخدم لاحقًا لمقارنة الفائزين بالخاسرين
+    touches: Optional[int] = None
+    base_days: Optional[int] = None
+    rsi: Optional[float] = None
+    short_interest_shares: Optional[float] = None
+    post_split_rise_pct: Optional[float] = None
+    stop_loss: Optional[float] = None
+    phoenix_score: Optional[float] = None
 
     @property
     def change_pct(self) -> Optional[float]:
@@ -214,4 +228,21 @@ class TrackedStock:
             "Last Price": round(self.last_price, 3) if self.last_price is not None else "N/A",
             "Change %": self.change_pct if self.change_pct is not None else "N/A",
             "Reason": self.reason,
+            "Touches": self.touches if self.touches is not None else "N/A",
+            "Base Days": self.base_days if self.base_days is not None else "N/A",
+            "RSI": round(self.rsi, 1) if self.rsi is not None else "N/A",
+            "Short Interest (shares)": (
+                f"{self.short_interest_shares:,.0f}"
+                if self.short_interest_shares is not None
+                else "N/A"
+            ),
+            "Post-Split Rise %": (
+                round(self.post_split_rise_pct, 1)
+                if self.post_split_rise_pct is not None
+                else "N/A"
+            ),
+            "Stop Loss": round(self.stop_loss, 3) if self.stop_loss is not None else "N/A",
+            "Phoenix Score": (
+                round(self.phoenix_score, 1) if self.phoenix_score is not None else "N/A"
+            ),
         }
