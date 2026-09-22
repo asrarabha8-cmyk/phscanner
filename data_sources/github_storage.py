@@ -33,6 +33,13 @@ _CSV_HEADERS = [
     "reason",
     "last_checked_date",
     "last_price",
+    "touches",
+    "base_days",
+    "rsi",
+    "short_interest_shares",
+    "post_split_rise_pct",
+    "stop_loss",
+    "phoenix_score",
 ]
 
 
@@ -46,6 +53,20 @@ def _headers():
 
 def _api_url():
     return f"{GITHUB_API_BASE}/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
+
+
+def _parse_optional_float(raw: Optional[str]) -> Optional[float]:
+    if raw is None or raw == "":
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_optional_int(raw: Optional[str]) -> Optional[int]:
+    val = _parse_optional_float(raw)
+    return int(val) if val is not None else None
 
 
 def read_tracked_stocks() -> List[TrackedStock]:
@@ -76,6 +97,17 @@ def read_tracked_stocks() -> List[TrackedStock]:
                     last_price=(
                         float(row["last_price"]) if row.get("last_price") else None
                     ),
+                    touches=_parse_optional_int(row.get("touches")),
+                    base_days=_parse_optional_int(row.get("base_days")),
+                    rsi=_parse_optional_float(row.get("rsi")),
+                    short_interest_shares=_parse_optional_float(
+                        row.get("short_interest_shares")
+                    ),
+                    post_split_rise_pct=_parse_optional_float(
+                        row.get("post_split_rise_pct")
+                    ),
+                    stop_loss=_parse_optional_float(row.get("stop_loss")),
+                    phoenix_score=_parse_optional_float(row.get("phoenix_score")),
                 )
             )
         return stocks
@@ -102,6 +134,19 @@ def write_tracked_stocks(stocks: List[TrackedStock], commit_message: str) -> boo
                     if s.last_checked_date
                     else "",
                     "last_price": s.last_price if s.last_price is not None else "",
+                    "touches": s.touches if s.touches is not None else "",
+                    "base_days": s.base_days if s.base_days is not None else "",
+                    "rsi": s.rsi if s.rsi is not None else "",
+                    "short_interest_shares": (
+                        s.short_interest_shares
+                        if s.short_interest_shares is not None
+                        else ""
+                    ),
+                    "post_split_rise_pct": (
+                        s.post_split_rise_pct if s.post_split_rise_pct is not None else ""
+                    ),
+                    "stop_loss": s.stop_loss if s.stop_loss is not None else "",
+                    "phoenix_score": s.phoenix_score if s.phoenix_score is not None else "",
                 }
             )
         content = output.getvalue()
