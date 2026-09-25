@@ -10,6 +10,12 @@ those layers knows about the other (Clean Architecture).
 سقف أمان (sanity ceiling) لاستبعاد الحالات الشاذة جدًا (احتيال محتمل أو
 خطأ بيانات)، لا فلترة حقيقية.
 
+تحديث آخر: الأسهم اللي تفشل بس بسبب سيولة يومية ضعيفة (dollar volume)
+ما تُرفض نهائيًا بعد الآن -- تُسجَّل كـ"قريبة من التأهل" (near-miss)
+لأن هذا بالضبط نمط الأسهم صغيرة الـ float اللي ممكن تنفجر فجأة
+(مثال حقيقي: MSGY رفعت 200%+ بيوم واحد ولم تظهر أبدًا لأنها اتُرفضت
+بصمت من فلتر السيولة).
+
 ترتيب المراحل:
 1. الترشيح الأولي بالسعر/القيمة السوقية (NASDAQ Screener، مجاني وسريع)
 2. فحص Reverse Split (Polygon) على القائمة المصغّرة
@@ -292,9 +298,25 @@ class Screener:
                 return None, "shares_outstanding_out_of_range", near_miss
             return None, "shares_outstanding_out_of_range", None
 
+        # -------- سيولة يومية ضعيفة: مو رفض نهائي، تسجَّل كـ"مراقبة" --------
+        # أسهم float صغير جدًا (نجتاز فحص عدد الأسهم القائمة فوق) ممكن
+        # تكون خاملة السيولة لفترة ثم تنفجر فجأة بيوم واحد (مثال: MSGY).
         avg_dollar_volume = float((df["Close"] * df["Volume"]).tail(20).mean())
         if avg_dollar_volume < params.min_dollar_volume:
-            return None, "low_dollar_volume", None
+            short_interest = self.short_interest_source.get_short_interest(ticker)
+            near_miss = NearMissResult(
+                ticker=ticker,
+                price=last_price,
+                gap_description=(
+                    f"سيولة يومية ضعيفة {avg_dollar_volume:,.0f}$ "
+                    f"(المطلوب {params.min_dollar_volume:,.0f}$) -- محتمل float صغير قابل للانفجار"
+                ),
+                short_float_pct=short_interest.short_float_pct,
+                short_interest_shares=short_interest.short_interest_shares,
+                borrow_fee_pct=short_interest.borrow_fee_pct,
+                rsi=rsi,
+            )
+            return None, "low_dollar_volume", near_miss
 
         # -------- الصعود بعد التقسيم: يُحسب فقط، سقف أمان للحالات الشاذة جدًا --------
         rise_pct = self._calc_post_split_rise(df, reverse_split.split_date)
