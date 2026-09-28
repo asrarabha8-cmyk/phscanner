@@ -20,7 +20,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-            - name: Write Streamlit secrets
+      - name: Write Streamlit secrets
         env:
           GH_TOKEN_SECRET: ${{ secrets.PAT_TOKEN }}
           POLY_KEY_SECRET: ${{ secrets.POLYGON_API_KEY }}
@@ -32,7 +32,6 @@ jobs:
               f.write("GITHUB_TOKEN = " + json.dumps(os.environ["GH_TOKEN_SECRET"].strip()) + "\n")
               f.write("POLYGON_API_KEY = " + json.dumps(os.environ["POLY_KEY_SECRET"].strip()) + "\n")
           PYEOF
-
 
       - name: Run scan
         run: python run_scan.py
