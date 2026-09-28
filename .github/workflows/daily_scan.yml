@@ -20,13 +20,12 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Write Streamlit secrets
+            - name: Write Streamlit secrets
         run: |
           mkdir -p .streamlit
-          cat > .streamlit/secrets.toml << EOF
-          GITHUB_TOKEN = "${{ secrets.PAT_TOKEN }}"
-          POLYGON_API_KEY = "${{ secrets.POLYGON_API_KEY }}"
-          EOF
+          echo "GITHUB_TOKEN = \"${{ secrets.PAT_TOKEN }}\"" > .streamlit/secrets.toml
+          echo "POLYGON_API_KEY = \"${{ secrets.POLYGON_API_KEY }}\"" >> .streamlit/secrets.toml
+
 
       - name: Run scan
         run: python run_scan.py
