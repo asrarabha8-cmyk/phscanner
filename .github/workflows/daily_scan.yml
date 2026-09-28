@@ -21,10 +21,13 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Write Streamlit secrets
+        env:
+          GH_TOKEN_SECRET: ${{ secrets.PAT_TOKEN }}
+          POLY_KEY_SECRET: ${{ secrets.POLYGON_API_KEY }}
         run: |
           mkdir -p .streamlit
-          echo "GITHUB_TOKEN = \"${{ secrets.PAT_TOKEN }}\"" > .streamlit/secrets.toml
-          echo "POLYGON_API_KEY = \"${{ secrets.POLYGON_API_KEY }}\"" >> .streamlit/secrets.toml
+          printf "GITHUB_TOKEN = '%s'\n" "$GH_TOKEN_SECRET" > .streamlit/secrets.toml
+          printf "POLYGON_API_KEY = '%s'\n" "$POLY_KEY_SECRET" >> .streamlit/secrets.toml
 
       - name: Run scan
         run: python run_scan.py
