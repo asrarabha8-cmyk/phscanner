@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مراقب فينيكس</title>
+<style>
+  :root {
+    --bg: #0d0f12;
+    --card: #16191d;
+    --card-border: #262b31;
+    --text: #e8eaed;
+    --muted: #8b929c;
+    --green: #2ecc71;
+    --yellow: #f1c40f;
+    --red: #e74c3c;
+    --blue: #3498db;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+    padding: 16px;
+    padding-bottom: 60px;
+  }
+  header {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  header h1 {
+    font-size: 22px;
+    margin: 0 0 4px;
+  }
+  header p {
+    color: var(--muted);
+    font-size: 13px;
+    margin: 0;
+  }
+  .stage-tabs {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 10px;
+    margin-bottom: 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .stage-tab {
+    flex: 0 0 auto;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    padding: 8px 14px;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .stage-tab.active {
+    background: var(--blue);
+    color: #fff;
+    border-color: var(--blue);
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .ticker {
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .price {
+    font-size: 15px;
+    color: var(--muted);
+  }
+  .change {
+    font-size: 13px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+  .change.up { color: var(--green); background: rgba(46,204,113,0.12); }
+  .change.down { color: var(--red); background: rgba(231,76,60,0.12); }
+  .change.flat { color: var(--muted); background: rgba(139,146,156,0.1); }
+
+  .stepper {
+    display: flex;
+    justify-content: space-between;
+    margin: 12px 0;
+    position: relative;
+  }
+  .stepper::before {
+    content: "";
+    position: absolute;
+    top: 11px;
+    right: 5%;
+    left: 5%;
+    height: 2px;
+    background: var(--card-border);
+    z-index: 0;
+  }
+  .step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    z-index: 1;
+    flex: 1;
+  }
+  .step-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--card-border);
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    border: 2px solid var(--bg);
+  }
+  .step.done .step-dot { background: var(--green); color: #fff; }
+  .step.current .step-dot { background: var(--blue); color: #fff; }
+  .step-label { font-size: 10px; color: var(--muted); }
+  .step.done .step-label, .step.current .step-label { color: var(--text); }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 10px 0;
+  }
+  .tag {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 8px;
+    background: rgba(139,146,156,0.1);
+    color: var(--muted);
+  }
+  .tag.warn { background: rgba(241,196,15,0.12); color: var(--yellow); }
+  .tag.good { background: rgba(46,204,113,0.12); color: var(--green); }
+  .tag.info { background: rgba(52,152,219,0.12); color: var(--blue); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    font-size: 12px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--card-border);
+  }
+  .grid div span { color: var(--muted); }
+  .grid div b { color: var(--text); }
+
+  .reason {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 40px 0;
+    font-size: 14px;
+  }
+  .loading {
+    text-align: center;
+    color: var(--muted);
+    padding: 40px 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔥 مراقب فينيكس</h1>
+  <p id="updated">جاري التحميل...</p>
+</header>
+
+<div class="stage-tabs" id="stageTabs"></div>
+<div id="cards"><div class="loading">جاري جلب البيانات من GitHub...</div></div>
+
+<script>
+const CSV_URL = "https://raw.githubusercontent.com/asrarabha8-cmyk/phscanner/main/data/tracked_stocks.csv";
+
+const STAGES = {
+  5: { label: "تأكيد", color: "var(--green)" },
+  4: { label: "اختبار", color: "var(--blue)" },
+  3: { label: "ارتداد", color: "var(--yellow)" },
+  2: { label: "ثبات", color: "var(--muted)" },
+  1: { label: "قاع", color: "var(--red)" },
+};
+const STEP_ORDER = [1, 2, 3, 4, 5];
+
+let currentFilter = "all";
+let allRows = [];
+
+function parseCSV(text) {
+  const rows = [];
+  let row = [], field = "", inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
+      else if (c === '"') { inQuotes = false; }
+      else { field += c; }
+    } else {
+      if (c === '"') { inQuotes = true; }
+      else if (c === ',') { row.push(field); field = ""; }
+      else if (c === '\n' || c === '\r') {
+        if (c === '\r' && text[i + 1] === '\n') i++;
+        row.push(field); field = "";
+        if (row.length > 1 || row[0] !== "") rows.push(row);
+        row = [];
+      } else { field += c; }
+    }
+  }
+  if (field !== "" || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+function toNum(v) {
+  if (v === undefined || v === null || v === "") return null;
+  const n = parseFloat(v);
+  return isNaN(n) ? null : n;
+}
+
+async function load() {
+  try {
+    const resp = await fetch(CSV_URL + "?t=" + Date.now());
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const text = await resp.text();
+    const rows = parseCSV(text);
+    const headers = rows[0];
+    const idx = {};
+    headers.forEach((h, i) => idx[h] = i);
+
+    const parsed = rows.slice(1).map(r => ({
+      ticker: r[idx.ticker],
+      discovery_date: r[idx.discovery_date],
+      discovery_price: toNum(r[idx.discovery_price]),
+      kind: r[idx.kind],
+      reason: r[idx.reason],
+      last_price: toNum(r[idx.last_price]),
+      touches: toNum(r[idx.touches]),
+      base_days: toNum(r[idx.base_days]),
+      rsi: toNum(r[idx.rsi]),
+      short_interest_shares: toNum(r[idx.short_interest_shares]),
+      post_split_rise_pct: toNum(r[idx.post_split_rise_pct]),
+      stop_loss: toNum(r[idx.stop_loss]),
+      phoenix_score: toNum(r[idx.phoenix_score]),
+      ema_position: r[idx.ema_position] || null,
+      cycle_stage: toNum(r[idx.cycle_stage]),
+      cycle_stage_label: r[idx.cycle_stage_label] || null,
+    })).filter(r => r.ticker);
+
+    // نبقي أحدث اكتشاف لكل رمز فقط
+    const latest = {};
+    parsed.forEach(r => {
+      const key = r.ticker;
+      if (!latest[key] || r.discovery_date > latest[key].discovery_date) {
+        latest[key] = r;
+      }
+    });
+    allRows = Object.values(latest).filter(r => r.cycle_stage);
+
+    document.getElementById("updated").textContent =
+      `${allRows.length} سهم مراقَب • آخر تحديث: ${new Date().toLocaleString("ar-SA")}`;
+
+    renderTabs();
+    render();
+  } catch (e) {
+    document.getElementById("cards").innerHTML =
+      `<div class="empty">فشل جلب البيانات: ${e.message}<br>تأكد إن رابط الملف صحيح والمستودع عام.</div>`;
+    document.getElementById("updated").textContent = "خطأ بالتحميل";
+  }
+}
+
+function renderTabs() {
+  const counts = { all: allRows.length };
+  STEP_ORDER.forEach(s => counts[s] = allRows.filter(r => r.cycle_stage === s).length);
+
+  const tabsHtml = [`<div class="stage-tab ${currentFilter === 'all' ? 'active' : ''}" onclick="setFilter('all')">الكل (${counts.all})</div>`]
+    .concat([5, 4, 3, 2, 1].map(s =>
+      `<div class="stage-tab ${currentFilter == s ? 'active' : ''}" onclick="setFilter(${s})">${STAGES[s].label} (${counts[s] || 0})</div>`
+    ));
+  document.getElementById("stageTabs").innerHTML = tabsHtml.join("");
+}
+
+function setFilter(f) {
+  currentFilter = f;
+  renderTabs();
+  render();
+}
+
+function changeClass(pct) {
+  if (pct === null) return "flat";
+  if (pct > 0.5) return "up";
+  if (pct < -0.5) return "down";
+  return "flat";
+}
+
+function shortLabel(shares) {
+  if (shares === null) return null;
+  if (shares < 15000) return { text: "شورت قليل", cls: "good" };
+  if (shares >= 50000) return { text: "شورت عالٍ", cls: "warn" };
+  return { text: "شورت متوسط", cls: "info" };
+}
+
+function card(r) {
+  const changePct = (r.last_price !== null && r.discovery_price)
+    ? ((r.last_price - r.discovery_price) / r.discovery_price * 100) : null;
+  const price = r.last_price !== null ? r.last_price : r.discovery_price;
+  const stage = r.cycle_stage;
+
+  const steps = STEP_ORDER.map(s => {
+    let cls = "";
+    if (s < stage) cls = "done";
+    else if (s === stage) cls = "current";
+    return `<div class="step ${cls}"><div class="step-dot">${s}</div><div class="step-label">${STAGES[s].label}</div></div>`;
+  }).join("");
+
+  const tags = [];
+  if (r.ema_position) {
+    tags.push(`<span class="tag ${r.ema_position.includes('أسفل') ? 'info' : r.ema_position.includes('أعلى') ? 'good' : ''}">${r.ema_position}</span>`);
+  }
+  if (r.rsi !== null) {
+    const rsiCls = r.rsi <= 30 ? "good" : r.rsi >= 70 ? "warn" : "";
+    tags.push(`<span class="tag ${rsiCls}">RSI ${r.rsi.toFixed(1)}</span>`);
+  }
+  const sl = shortLabel(r.short_interest_shares);
+  if (sl) tags.push(`<span class="tag ${sl.cls}">${sl.text}</span>`);
+  if (r.touches !== null) tags.push(`<span class="tag">${r.touches} ملامسة</span>`);
+  if (r.phoenix_score !== null) tags.push(`<span class="tag good">سكور ${r.phoenix_score}</span>`);
+
+  return `
+    <div class="card">
+      <div class="card-top">
+        <div>
+          <div class="ticker">${r.ticker}</div>
+          <div class="price">$${price !== null ? price.toFixed(2) : "N/A"}</div>
+        </div>
+        <div class="change ${changeClass(changePct)}">
+          ${changePct !== null ? (changePct > 0 ? "+" : "") + changePct.toFixed(1) + "%" : "N/A"}
+        </div>
+      </div>
+      <div class="stepper">${steps}</div>
+      <div class="tags">${tags.join("")}</div>
+      <div class="grid">
+        <div><span>وقف الخسارة:</span> <b>${r.stop_loss !== null ? "$" + r.stop_loss.toFixed(2) : "N/A"}</b></div>
+        <div><span>أيام القاعدة:</span> <b>${r.base_days !== null ? r.base_days : "N/A"}</b></div>
+        <div><span>ارتداد بعد القسم:</span> <b>${r.post_split_rise_pct !== null ? r.post_split_rise_pct.toFixed(1) + "%" : "N/A"}</b></div>
+        <div><span>الاكتشاف:</span> <b>${r.discovery_date}</b></div>
+      </div>
+      ${r.kind === "near_miss" ? `<div class="reason">${r.reason}</div>` : ""}
+    </div>
+  `;
+}
+
+function render() {
+  let rows = allRows;
+  if (currentFilter !== "all") {
+    rows = rows.filter(r => r.cycle_stage === currentFilter);
+  }
+  rows = rows.sort((a, b) => b.cycle_stage - a.cycle_stage);
+
+  if (rows.length === 0) {
+    document.getElementById("cards").innerHTML = `<div class="empty">لا يوجد أسهم بهالمرحلة حالياً</div>`;
+    return;
+  }
+  document.getElementById("cards").innerHTML = rows.map(card).join("");
+}
+
+load();
+</script>
+
+</body>
+</html>
