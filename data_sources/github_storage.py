@@ -4,6 +4,9 @@ data_sources/github_storage.py
 يقرأ ويكتب ملف تتبّع الأسهم (tracked_stocks.csv) مباشرة على GitHub عبر
 GitHub REST API، باستخدام GITHUB_TOKEN المخزّن بـ Streamlit secrets.
 هذا يضمن أن السجل يبقى دائمًا بين كل إعادة نشر للتطبيق (مو ذاكرة مؤقتة).
+
+هذا الملف نفسه يُقرأ مباشرة (raw) من صفحة المراقبة الثابتة (monitor.html)
+المستضافة على GitHub Pages -- المستودع عام، فما يحتاج مصادقة للقراءة.
 """
 
 import base64
@@ -40,6 +43,9 @@ _CSV_HEADERS = [
     "post_split_rise_pct",
     "stop_loss",
     "phoenix_score",
+    "ema_position",
+    "cycle_stage",
+    "cycle_stage_label",
 ]
 
 
@@ -67,6 +73,12 @@ def _parse_optional_float(raw: Optional[str]) -> Optional[float]:
 def _parse_optional_int(raw: Optional[str]) -> Optional[int]:
     val = _parse_optional_float(raw)
     return int(val) if val is not None else None
+
+
+def _parse_optional_str(raw: Optional[str]) -> Optional[str]:
+    if raw is None or raw == "":
+        return None
+    return raw
 
 
 def read_tracked_stocks() -> List[TrackedStock]:
@@ -108,6 +120,9 @@ def read_tracked_stocks() -> List[TrackedStock]:
                     ),
                     stop_loss=_parse_optional_float(row.get("stop_loss")),
                     phoenix_score=_parse_optional_float(row.get("phoenix_score")),
+                    ema_position=_parse_optional_str(row.get("ema_position")),
+                    cycle_stage=_parse_optional_int(row.get("cycle_stage")),
+                    cycle_stage_label=_parse_optional_str(row.get("cycle_stage_label")),
                 )
             )
         return stocks
@@ -147,6 +162,11 @@ def write_tracked_stocks(stocks: List[TrackedStock], commit_message: str) -> boo
                     ),
                     "stop_loss": s.stop_loss if s.stop_loss is not None else "",
                     "phoenix_score": s.phoenix_score if s.phoenix_score is not None else "",
+                    "ema_position": s.ema_position if s.ema_position is not None else "",
+                    "cycle_stage": s.cycle_stage if s.cycle_stage is not None else "",
+                    "cycle_stage_label": (
+                        s.cycle_stage_label if s.cycle_stage_label is not None else ""
+                    ),
                 }
             )
         content = output.getvalue()
