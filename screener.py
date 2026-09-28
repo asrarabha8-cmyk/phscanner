@@ -10,11 +10,14 @@ those layers knows about the other (Clean Architecture).
 سقف أمان (sanity ceiling) لاستبعاد الحالات الشاذة جدًا (احتيال محتمل أو
 خطأ بيانات)، لا فلترة حقيقية.
 
-تحديث آخر: الأسهم اللي تفشل بس بسبب سيولة يومية ضعيفة (dollar volume)
-ما تُرفض نهائيًا بعد الآن -- تُسجَّل كـ"قريبة من التأهل" (near-miss)
-لأن هذا بالضبط نمط الأسهم صغيرة الـ float اللي ممكن تنفجر فجأة
-(مثال حقيقي: MSGY رفعت 200%+ بيوم واحد ولم تظهر أبدًا لأنها اتُرفضت
-بصمت من فلتر السيولة).
+تحديث: الأسهم اللي تفشل بس بسبب سيولة يومية ضعيفة (dollar volume) ما تُرفض
+نهائيًا -- تُسجَّل كـ"قريبة من التأهل" (near-miss) لأن هذا بالضبط نمط
+الأسهم صغيرة الـ float اللي ممكن تنفجر فجأة (مثال حقيقي: MSGY).
+
+تحديث آخر: أضفنا حساب EMA (موضع السعر من المتوسطات) و"مرحلة دورة الدعم"
+(قاع/ثبات/ارتداد/اختبار/تأكيد) -- مقتبسة من منهجية فيصل، تُحسب لكل الأسهم
+اللي عندها Reverse Split بغض النظر عن نجاحها، وتُنشر لصفحة المراقبة
+الثابتة (monitor.html) عبر نفس ملف tracked_stocks.csv.
 
 ترتيب المراحل:
 1. الترشيح الأولي بالسعر/القيمة السوقية (NASDAQ Screener، مجاني وسريع)
@@ -25,8 +28,8 @@ those layers knows about the other (Clean Architecture).
    كمؤشرات تأكيد إضافية)، مع تصنيف الأسهم "القريبة من التأهل" في
    قائمة منفصلة
 5. حفظ كل النتائج (رئيسية + قريبة) بسجل المتابعة الدائم على GitHub،
-   مع خصائصها وقت الاكتشاف (RSI/ملامسات/شورت/سكور/وقف خسارة) عشان
-   نقدر لاحقًا نقارن خصائص الفائزين بالخاسرين إحصائيًا.
+   مع خصائصها وقت الاكتشاف (RSI/ملامسات/شورت/سكور/وقف خسارة/EMA/مرحلة
+   الدورة) عشان نقدر لاحقًا نقارن خصائص الفائزين بالخاسرين إحصائيًا.
 """
 
 import logging
@@ -55,6 +58,8 @@ from data_sources.prefilter_source import get_prefiltered_tickers
 from analysis.support_detector import SupportDetector
 from analysis.volume_analyzer import VolumeAnalyzer
 from analysis.rsi_calculator import calculate_rsi
+from analysis.ema_calculator import calculate_ema_position
+from analysis.cycle_stage import determine_cycle_stage
 from analysis.scorer import PhoenixScorer
 
 logger = logging.getLogger(__name__)
@@ -201,39 +206,54 @@ class Screener:
         near_misses.sort(key=lambda n: n.gap_description)
 
         today = date.today()
-        tracked_new = [
-            TrackedStock(
-                ticker=r.ticker,
-                discovery_date=today,
-                discovery_price=r.price,
-                kind="result",
-                reason="passed",
-                touches=r.support_zone.touches,
-                base_days=r.support_zone.base_days,
-                rsi=r.rsi,
-                short_interest_shares=r.short_interest.short_interest_shares,
-                post_split_rise_pct=r.post_split_rise_pct,
-                stop_loss=r.support_zone.first_touch_low,
-                phoenix_score=r.score.total,
+        tracked_new = []
+        for r in results:
+            stage_num, stage_label = determine_cycle_stage(
+                passed=True, touches=r.support_zone.touches, rise_pct=r.post_split_rise_pct
             )
-            for r in results
-        ] + [
-            TrackedStock(
-                ticker=n.ticker,
-                discovery_date=today,
-                discovery_price=n.price,
-                kind="near_miss",
-                reason=n.gap_description,
-                touches=n.touches,
-                base_days=n.base_days,
-                rsi=n.rsi,
-                short_interest_shares=n.short_interest_shares,
-                post_split_rise_pct=n.post_split_rise_pct,
-                stop_loss=n.stop_loss,
-                phoenix_score=None,
+            tracked_new.append(
+                TrackedStock(
+                    ticker=r.ticker,
+                    discovery_date=today,
+                    discovery_price=r.price,
+                    kind="result",
+                    reason="passed",
+                    touches=r.support_zone.touches,
+                    base_days=r.support_zone.base_days,
+                    rsi=r.rsi,
+                    short_interest_shares=r.short_interest.short_interest_shares,
+                    post_split_rise_pct=r.post_split_rise_pct,
+                    stop_loss=r.support_zone.first_touch_low,
+                    phoenix_score=r.score.total,
+                    ema_position=r.ema_position,
+                    cycle_stage=stage_num,
+                    cycle_stage_label=stage_label,
+                )
             )
-            for n in near_misses
-        ]
+        for n in near_misses:
+            stage_num, stage_label = determine_cycle_stage(
+                passed=False, touches=n.touches, rise_pct=n.post_split_rise_pct
+            )
+            tracked_new.append(
+                TrackedStock(
+                    ticker=n.ticker,
+                    discovery_date=today,
+                    discovery_price=n.price,
+                    kind="near_miss",
+                    reason=n.gap_description,
+                    touches=n.touches,
+                    base_days=n.base_days,
+                    rsi=n.rsi,
+                    short_interest_shares=n.short_interest_shares,
+                    post_split_rise_pct=n.post_split_rise_pct,
+                    stop_loss=n.stop_loss,
+                    phoenix_score=None,
+                    ema_position=n.ema_position,
+                    cycle_stage=stage_num,
+                    cycle_stage_label=stage_label,
+                )
+            )
+
         if tracked_new:
             try:
                 add_new_tracked_stocks(tracked_new)
@@ -270,6 +290,9 @@ class Screener:
             return None, "price_out_of_range", None
 
         rsi = calculate_rsi(df)
+        ema_position = calculate_ema_position(df)
+        # يُحسب مبكرًا (بدل بعد فلتر السيولة) عشان يتوفر لكل حالات near-miss
+        rise_pct = self._calc_post_split_rise(df, reverse_split.split_date)
 
         shares_outstanding = get_shares_outstanding(ticker)
         if shares_outstanding is None:
@@ -294,6 +317,7 @@ class Screener:
                     short_interest_shares=short_interest.short_interest_shares,
                     borrow_fee_pct=short_interest.borrow_fee_pct,
                     rsi=rsi,
+                    ema_position=ema_position,
                 )
                 return None, "shares_outstanding_out_of_range", near_miss
             return None, "shares_outstanding_out_of_range", None
@@ -315,11 +339,12 @@ class Screener:
                 short_interest_shares=short_interest.short_interest_shares,
                 borrow_fee_pct=short_interest.borrow_fee_pct,
                 rsi=rsi,
+                post_split_rise_pct=rise_pct,
+                ema_position=ema_position,
             )
             return None, "low_dollar_volume", near_miss
 
-        # -------- الصعود بعد التقسيم: يُحسب فقط، سقف أمان للحالات الشاذة جدًا --------
-        rise_pct = self._calc_post_split_rise(df, reverse_split.split_date)
+        # -------- سقف أمان للحالات الشاذة جدًا فقط --------
         if rise_pct > _SANITY_CEILING_RISE_PCT:
             return None, "extreme_rise_sanity_check", None
 
@@ -351,6 +376,7 @@ class Screener:
                 base_days=support_zone.base_days,
                 post_split_rise_pct=rise_pct,
                 stop_loss=support_zone.first_touch_low,
+                ema_position=ema_position,
             )
             return None, "not_enough_touches", near_miss
 
@@ -389,5 +415,6 @@ class Screener:
             score=score,
             rsi=rsi,
             post_split_rise_pct=rise_pct,
+            ema_position=ema_position,
         )
         return result, "passed", None
