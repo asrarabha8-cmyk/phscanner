@@ -72,12 +72,40 @@ class ShortInterestInfo:
     available: bool = False
 
 
-def _short_interest_label(shares: Optional[float]) -> str:
-    if shares is None:
+def _short_interest_label(shares: Optional[float], pct: Optional[float] = None) -> str:
+    """يصنف مستوى الشورت.
+
+    نحسب تصنيفًا من العدد المطلق للأسهم، وتصنيفًا آخر من النسبة المئوية،
+    ثم نأخذ الأفضل (الأقل خطورة) بين الاثنين دائمًا -- لأن سهمًا بعدد أسهم
+    قائمة كبير قد يكون له عدد شورت مرتفع ظاهريًا لكنه ضئيل نسبيًا، والعكس صحيح.
+    """
+
+    def _level_from_shares(s: Optional[float]) -> Optional[int]:
+        if s is None:
+            return None
+        if s < 20_000:
+            return 1
+        if s >= 50_000:
+            return 3
+        return 2
+
+    def _level_from_pct(p: Optional[float]) -> Optional[int]:
+        if p is None:
+            return None
+        if p < 20.0:
+            return 1
+        if p >= 50.0:
+            return 3
+        return 2
+
+    levels = [lvl for lvl in (_level_from_shares(shares), _level_from_pct(pct)) if lvl is not None]
+    if not levels:
         return "N/A"
-    if shares < 15_000:
+
+    best = min(levels)
+    if best == 1:
         return "🟢 قليل"
-    if shares >= 50_000:
+    if best == 3:
         return "🔴 عالٍ"
     return "🟡 متوسط"
 
@@ -143,7 +171,10 @@ class StockResult:
                 if self.short_interest.short_interest_shares is not None
                 else "N/A"
             ),
-            "Short Level": _short_interest_label(self.short_interest.short_interest_shares),
+            "Short Level": _short_interest_label(
+                self.short_interest.short_interest_shares,
+                self.short_interest.short_float_pct,
+            ),
             "Borrow Fee %": (
                 round(self.short_interest.borrow_fee_pct, 2)
                 if self.short_interest.borrow_fee_pct is not None
@@ -187,7 +218,7 @@ class NearMissResult:
                 if self.short_interest_shares is not None
                 else "N/A"
             ),
-            "Short Level": _short_interest_label(self.short_interest_shares),
+            "Short Level": _short_interest_label(self.short_interest_shares, self.short_float_pct),
             "Borrow Fee %": (
                 round(self.borrow_fee_pct, 2) if self.borrow_fee_pct is not None else "N/A"
             ),
