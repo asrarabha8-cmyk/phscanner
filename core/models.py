@@ -115,6 +115,7 @@ class StockResult:
     score: ScoreBreakdown
     rsi: Optional[float] = None
     post_split_rise_pct: float = 0.0
+    ema_position: Optional[str] = None
 
     def to_row(self) -> dict:
         return {
@@ -150,6 +151,7 @@ class StockResult:
             ),
             "RSI": round(self.rsi, 1) if self.rsi is not None else "N/A",
             "RVOL": round(self.volume_profile.relative_volume, 2),
+            "EMA": self.ema_position if self.ema_position is not None else "N/A",
             "Reverse Split Date": self.reverse_split.split_date.isoformat(),
             "Phoenix Score": round(self.score.total, 1),
         }
@@ -165,11 +167,12 @@ class NearMissResult:
     borrow_fee_pct: Optional[float] = None
     rsi: Optional[float] = None
     # الحقول التالية متاحة فقط لما يكون سبب الاستبعاد "عدد ارتدادات الدعم"
-    # (يعني وصلنا لمرحلة كشف الدعم فعلاً) -- غير متاحة لحالات "الأسهم القائمة"
+    # أو "سيولة يومية ضعيفة" (يعني وصلنا لمرحلة حساب الارتداد/الدعم فعلاً)
     touches: Optional[int] = None
     base_days: Optional[int] = None
     post_split_rise_pct: Optional[float] = None
     stop_loss: Optional[float] = None
+    ema_position: Optional[str] = None
 
     def to_row(self) -> dict:
         return {
@@ -189,6 +192,7 @@ class NearMissResult:
                 round(self.borrow_fee_pct, 2) if self.borrow_fee_pct is not None else "N/A"
             ),
             "RSI": round(self.rsi, 1) if self.rsi is not None else "N/A",
+            "EMA": self.ema_position if self.ema_position is not None else "N/A",
         }
 
 
@@ -211,6 +215,9 @@ class TrackedStock:
     post_split_rise_pct: Optional[float] = None
     stop_loss: Optional[float] = None
     phoenix_score: Optional[float] = None
+    ema_position: Optional[str] = None
+    cycle_stage: Optional[int] = None
+    cycle_stage_label: Optional[str] = None
 
     @property
     def change_pct(self) -> Optional[float]:
@@ -245,4 +252,7 @@ class TrackedStock:
             "Phoenix Score": (
                 round(self.phoenix_score, 1) if self.phoenix_score is not None else "N/A"
             ),
+            "EMA": self.ema_position if self.ema_position is not None else "N/A",
+            "Cycle Stage": self.cycle_stage if self.cycle_stage is not None else "N/A",
+            "Cycle Stage Label": self.cycle_stage_label if self.cycle_stage_label is not None else "N/A",
         }
