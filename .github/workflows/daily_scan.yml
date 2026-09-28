@@ -26,8 +26,12 @@ jobs:
           POLY_KEY_SECRET: ${{ secrets.POLYGON_API_KEY }}
         run: |
           mkdir -p .streamlit
-          printf "GITHUB_TOKEN = '%s'\n" "$GH_TOKEN_SECRET" > .streamlit/secrets.toml
-          printf "POLYGON_API_KEY = '%s'\n" "$POLY_KEY_SECRET" >> .streamlit/secrets.toml
+          python3 - <<'PYEOF'
+          import json, os
+          with open(".streamlit/secrets.toml", "w") as f:
+              f.write("GITHUB_TOKEN = " + json.dumps(os.environ["GH_TOKEN_SECRET"]) + "\n")
+              f.write("POLYGON_API_KEY = " + json.dumps(os.environ["POLY_KEY_SECRET"]) + "\n")
+          PYEOF
 
       - name: Run scan
         run: python run_scan.py
