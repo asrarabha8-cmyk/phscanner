@@ -344,8 +344,8 @@ function card(r) {
   const sl = shortLabel(r.short_interest_shares);
   if (sl) tags.push(`<span class="tag ${sl.cls}">${sl.text}</span>`);
   if (r.touches !== null) tags.push(`<span class="tag">${r.touches} ملامسة</span>`);
-  if (r.phoenix_score !== null) tags.push(`<span class="tag good">سكور ${r.phoenix_score}</span>`);
-
+  if (r.phoenix_score !== null) tags.push(`<span class="tag good">سكور ${r.phoenix_score.toFixed(1)}</span>`);
+  
   return `
     <div class="card">
       <div class="card-top">
