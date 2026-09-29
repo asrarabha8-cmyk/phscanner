@@ -144,6 +144,8 @@ class StockResult:
     rsi: Optional[float] = None
     post_split_rise_pct: float = 0.0
     ema_position: Optional[str] = None
+    low_liquidity: bool = False
+    avg_dollar_volume: Optional[float] = None
 
     def to_row(self) -> dict:
         return {
@@ -183,6 +185,10 @@ class StockResult:
             "RSI": round(self.rsi, 1) if self.rsi is not None else "N/A",
             "RVOL": round(self.volume_profile.relative_volume, 2),
             "EMA": self.ema_position if self.ema_position is not None else "N/A",
+            "Low Liquidity": "⚠️ نعم" if self.low_liquidity else "لا",
+            "Avg $ Volume": (
+                f"{self.avg_dollar_volume:,.0f}$" if self.avg_dollar_volume is not None else "N/A"
+            ),
             "Reverse Split Date": self.reverse_split.split_date.isoformat(),
             "Phoenix Score": round(self.score.total, 1),
         }
@@ -198,7 +204,6 @@ class NearMissResult:
     borrow_fee_pct: Optional[float] = None
     rsi: Optional[float] = None
     # الحقول التالية متاحة فقط لما يكون سبب الاستبعاد "عدد ارتدادات الدعم"
-    # أو "سيولة يومية ضعيفة" (يعني وصلنا لمرحلة حساب الارتداد/الدعم فعلاً)
     touches: Optional[int] = None
     base_days: Optional[int] = None
     post_split_rise_pct: Optional[float] = None
@@ -238,7 +243,6 @@ class TrackedStock:
     reason: str
     last_checked_date: Optional[date] = None
     last_price: Optional[float] = None
-    # خصائص السهم وقت الاكتشاف -- تُستخدم لاحقًا لمقارنة الفائزين بالخاسرين
     touches: Optional[int] = None
     base_days: Optional[int] = None
     rsi: Optional[float] = None
