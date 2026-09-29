@@ -2,7 +2,7 @@ name: Daily Phoenix Scan
 
 on:
   schedule:
-    - cron: "35 23 * * *"
+      - cron: "30 21 * * 1-5"
   workflow_dispatch: {}
 
 jobs:
