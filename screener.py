@@ -10,9 +10,11 @@ those layers knows about the other (Clean Architecture).
 سقف أمان (sanity ceiling) لاستبعاد الحالات الشاذة جدًا (احتيال محتمل أو
 خطأ بيانات)، لا فلترة حقيقية.
 
-تحديث: الأسهم اللي تفشل بس بسبب سيولة يومية ضعيفة (dollar volume) ما تُرفض
-نهائيًا -- تُسجَّل كـ"قريبة من التأهل" (near-miss) لأن هذا بالضبط نمط
-الأسهم صغيرة الـ float اللي ممكن تنفجر فجأة (مثال حقيقي: MSGY).
+تحديث: الأسهم اللي سيولتها اليومية (dollar volume) ضعيفة ما تُستبعد
+نهائيًا ولا تُنقل لقائمة منفصلة -- تكمل نفس مسار الفحص الكامل (دعم/ملامسات/
+أخبار/شورت...)، وإذا اجتازت الباقي تظهر بنفس قائمة "النتائج الكاملة" مع
+علامة تحذير "سيولة منخفضة" لأن هذا بالضبط نمط الأسهم صغيرة الـfloat اللي
+ممكن تنفجر فجأة (مثال حقيقي: MSGY).
 
 تحديث آخر: أضفنا حساب EMA (موضع السعر من المتوسطات) و"مرحلة دورة الدعم"
 (قاع/ثبات/ارتداد/اختبار/تأكيد) -- مقتبسة من منهجية فيصل، تُحسب لكل الأسهم
@@ -25,8 +27,8 @@ those layers knows about the other (Clean Architecture).
 3. جلب السعر التاريخي (Polygon، وقت السوق الرسمي فقط) فقط على الأسهم
    اللي عندها Reverse Split
 4. باقي التحليل (شامل فلتر عدد الأسهم القائمة، RSI والشورت الخام
-   كمؤشرات تأكيد إضافية)، مع تصنيف الأسهم "القريبة من التأهل" في
-   قائمة منفصلة
+   كمؤشرات تأكيد إضافية، وعلامة السيولة المنخفضة بدون استبعاد)، مع
+   تصنيف الأسهم "القريبة من التأهل" (لأسباب غير السيولة) في قائمة منفصلة
 5. حفظ كل النتائج (رئيسية + قريبة) بسجل المتابعة الدائم على GitHub،
    مع خصائصها وقت الاكتشاف (RSI/ملامسات/شورت/سكور/وقف خسارة/EMA/مرحلة
    الدورة) عشان نقدر لاحقًا نقارن خصائص الفائزين بالخاسرين إحصائيًا.
@@ -217,7 +219,7 @@ class Screener:
                     discovery_date=today,
                     discovery_price=r.price,
                     kind="result",
-                    reason="passed",
+                    reason="passed" if not r.low_liquidity else "passed (سيولة منخفضة)",
                     touches=r.support_zone.touches,
                     base_days=r.support_zone.base_days,
                     rsi=r.rsi,
@@ -291,7 +293,7 @@ class Screener:
 
         rsi = calculate_rsi(df)
         ema_position = calculate_ema_position(df)
-        # يُحسب مبكرًا (بدل بعد فلتر السيولة) عشان يتوفر لكل حالات near-miss
+        # يُحسب مبكرًا عشان يتوفر لكل حالات near-miss
         rise_pct = self._calc_post_split_rise(df, reverse_split.split_date)
 
         shares_outstanding = get_shares_outstanding(ticker)
@@ -322,27 +324,13 @@ class Screener:
                 return None, "shares_outstanding_out_of_range", near_miss
             return None, "shares_outstanding_out_of_range", None
 
-        # -------- سيولة يومية ضعيفة: مو رفض نهائي، تسجَّل كـ"مراقبة" --------
+        # -------- سيولة يومية ضعيفة: علامة تحذير فقط، مو استبعاد --------
         # أسهم float صغير جدًا (نجتاز فحص عدد الأسهم القائمة فوق) ممكن
         # تكون خاملة السيولة لفترة ثم تنفجر فجأة بيوم واحد (مثال: MSGY).
+        # نحسب العلم ونكمل نفس مسار الفحص الكامل بدل ما نستبعد أو ننقلها
+        # لقائمة منفصلة.
         avg_dollar_volume = float((df["Close"] * df["Volume"]).tail(20).mean())
-        if avg_dollar_volume < params.min_dollar_volume:
-            short_interest = self.short_interest_source.get_short_interest(ticker)
-            near_miss = NearMissResult(
-                ticker=ticker,
-                price=last_price,
-                gap_description=(
-                    f"سيولة يومية ضعيفة {avg_dollar_volume:,.0f}$ "
-                    f"(المطلوب {params.min_dollar_volume:,.0f}$) -- محتمل float صغير قابل للانفجار"
-                ),
-                short_float_pct=short_interest.short_float_pct,
-                short_interest_shares=short_interest.short_interest_shares,
-                borrow_fee_pct=short_interest.borrow_fee_pct,
-                rsi=rsi,
-                post_split_rise_pct=rise_pct,
-                ema_position=ema_position,
-            )
-            return None, "low_dollar_volume", near_miss
+        is_low_liquidity = avg_dollar_volume < params.min_dollar_volume
 
         # -------- سقف أمان للحالات الشاذة جدًا فقط --------
         if rise_pct > _SANITY_CEILING_RISE_PCT:
@@ -416,5 +404,7 @@ class Screener:
             rsi=rsi,
             post_split_rise_pct=rise_pct,
             ema_position=ema_position,
+            low_liquidity=is_low_liquidity,
+            avg_dollar_volume=avg_dollar_volume,
         )
         return result, "passed", None
