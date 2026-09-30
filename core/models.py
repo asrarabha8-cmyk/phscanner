@@ -33,6 +33,11 @@ class ScreenerParams:
     min_dollar_volume: float = 300_000
     max_results: int = 50
 
+    # نطاق RSI "المثالي" حسب منهجية فيصل -- يُستخدم فقط لتحديد خانة
+    # "الجاهز" (Ready)، مو كفلتر استبعاد حقيقي
+    ideal_rsi_min: float = 22.0
+    ideal_rsi_max: float = 29.0
+
 
 @dataclass
 class ReverseSplitInfo:
@@ -146,6 +151,7 @@ class StockResult:
     ema_position: Optional[str] = None
     low_liquidity: bool = False
     avg_dollar_volume: Optional[float] = None
+    is_ready: bool = False
 
     def to_row(self) -> dict:
         return {
@@ -189,6 +195,7 @@ class StockResult:
             "Avg $ Volume": (
                 f"{self.avg_dollar_volume:,.0f}$" if self.avg_dollar_volume is not None else "N/A"
             ),
+            "Ready": "✅ جاهز" if self.is_ready else "⏳ لا",
             "Reverse Split Date": self.reverse_split.split_date.isoformat(),
             "Phoenix Score": round(self.score.total, 1),
         }
@@ -203,7 +210,6 @@ class NearMissResult:
     short_interest_shares: Optional[float] = None
     borrow_fee_pct: Optional[float] = None
     rsi: Optional[float] = None
-    # الحقول التالية متاحة فقط لما يكون سبب الاستبعاد "عدد ارتدادات الدعم"
     touches: Optional[int] = None
     base_days: Optional[int] = None
     post_split_rise_pct: Optional[float] = None
