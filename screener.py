@@ -13,13 +13,12 @@ those layers knows about the other (Clean Architecture).
 تحديث: الأسهم اللي سيولتها اليومية (dollar volume) ضعيفة ما تُستبعد
 نهائيًا ولا تُنقل لقائمة منفصلة -- تكمل نفس مسار الفحص الكامل (دعم/ملامسات/
 أخبار/شورت...)، وإذا اجتازت الباقي تظهر بنفس قائمة "النتائج الكاملة" مع
-علامة تحذير "سيولة منخفضة" لأن هذا بالضبط نمط الأسهم صغيرة الـfloat اللي
-ممكن تنفجر فجأة (مثال حقيقي: MSGY).
+علامة تحذير "سيولة منخفضة".
 
-تحديث آخر: أضفنا حساب EMA (موضع السعر من المتوسطات) و"مرحلة دورة الدعم"
-(قاع/ثبات/ارتداد/اختبار/تأكيد) -- مقتبسة من منهجية فيصل، تُحسب لكل الأسهم
-اللي عندها Reverse Split بغض النظر عن نجاحها، وتُنشر لصفحة المراقبة
-الثابتة (monitor.html) عبر نفس ملف tracked_stocks.csv.
+تحديث آخر: أضفنا حساب EMA وموضع السعر من المتوسطات، و"مرحلة دورة الدعم"،
+وخانة "Ready" (جاهز) اللي تتحقق فقط لو السهم مو سيولة منخفضة **و** الـRSI
+داخل النطاق المثالي حسب منهجية فيصل (22-29) -- بدون ما تكون فلتر استبعاد،
+بس علامة تلخيصية توضح الأسهم الأقرب للدخول فوراً.
 
 ترتيب المراحل:
 1. الترشيح الأولي بالسعر/القيمة السوقية (NASDAQ Screener، مجاني وسريع)
@@ -27,8 +26,8 @@ those layers knows about the other (Clean Architecture).
 3. جلب السعر التاريخي (Polygon، وقت السوق الرسمي فقط) فقط على الأسهم
    اللي عندها Reverse Split
 4. باقي التحليل (شامل فلتر عدد الأسهم القائمة، RSI والشورت الخام
-   كمؤشرات تأكيد إضافية، وعلامة السيولة المنخفضة بدون استبعاد)، مع
-   تصنيف الأسهم "القريبة من التأهل" (لأسباب غير السيولة) في قائمة منفصلة
+   كمؤشرات تأكيد إضافية، وعلامتي السيولة المنخفضة والجاهزية بدون استبعاد)،
+   مع تصنيف الأسهم "القريبة من التأهل" (لأسباب غير السيولة) في قائمة منفصلة
 5. حفظ كل النتائج (رئيسية + قريبة) بسجل المتابعة الدائم على GitHub،
    مع خصائصها وقت الاكتشاف (RSI/ملامسات/شورت/سكور/وقف خسارة/EMA/مرحلة
    الدورة) عشان نقدر لاحقًا نقارن خصائص الفائزين بالخاسرين إحصائيًا.
@@ -213,13 +212,18 @@ class Screener:
             stage_num, stage_label = determine_cycle_stage(
                 passed=True, touches=r.support_zone.touches, rise_pct=r.post_split_rise_pct
             )
+            reason = "passed"
+            if r.low_liquidity:
+                reason += " (سيولة منخفضة)"
+            if r.is_ready:
+                reason += " [جاهز]"
             tracked_new.append(
                 TrackedStock(
                     ticker=r.ticker,
                     discovery_date=today,
                     discovery_price=r.price,
                     kind="result",
-                    reason="passed" if not r.low_liquidity else "passed (سيولة منخفضة)",
+                    reason=reason,
                     touches=r.support_zone.touches,
                     base_days=r.support_zone.base_days,
                     rsi=r.rsi,
@@ -325,10 +329,6 @@ class Screener:
             return None, "shares_outstanding_out_of_range", None
 
         # -------- سيولة يومية ضعيفة: علامة تحذير فقط، مو استبعاد --------
-        # أسهم float صغير جدًا (نجتاز فحص عدد الأسهم القائمة فوق) ممكن
-        # تكون خاملة السيولة لفترة ثم تنفجر فجأة بيوم واحد (مثال: MSGY).
-        # نحسب العلم ونكمل نفس مسار الفحص الكامل بدل ما نستبعد أو ننقلها
-        # لقائمة منفصلة.
         avg_dollar_volume = float((df["Close"] * df["Volume"]).tail(20).mean())
         is_low_liquidity = avg_dollar_volume < params.min_dollar_volume
 
@@ -392,6 +392,13 @@ class Screener:
         scorer = PhoenixScorer(tolerance_pct=params.support_tolerance_pct)
         score = scorer.score(reverse_split, support_zone, volume_profile, rise_pct)
 
+        # -------- خانة "الجاهز": كل الشروط + RSI بالمنطقة المثالية --------
+        is_ready = (
+            not is_low_liquidity
+            and rsi is not None
+            and params.ideal_rsi_min <= rsi <= params.ideal_rsi_max
+        )
+
         result = StockResult(
             ticker=ticker,
             price=last_price,
@@ -406,5 +413,6 @@ class Screener:
             ema_position=ema_position,
             low_liquidity=is_low_liquidity,
             avg_dollar_volume=avg_dollar_volume,
+            is_ready=is_ready,
         )
         return result, "passed", None
