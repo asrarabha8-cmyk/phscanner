@@ -396,11 +396,9 @@ class Screener:
         score = scorer.score(reverse_split, support_zone, volume_profile, rise_pct)
 
         # -------- خانة "الجاهز": كل الشروط + RSI أقل من 29 --------
-        is_ready = (
-            not is_low_liquidity
-            and rsi is not None
-            and rsi < params.ideal_rsi_max
-        )
+                # -------- خانة "الجاهز": RSI أقل من 29 فقط --------
+        is_ready = rsi is not None and rsi < params.ideal_rsi_max
+
 
         result = StockResult(
             ticker=ticker,
