@@ -69,6 +69,9 @@
     padding: 14px;
     margin-bottom: 12px;
   }
+  .card.ready {
+    border-color: var(--green);
+  }
   .card-top {
     display: flex;
     justify-content: space-between;
@@ -238,6 +241,11 @@ function toNum(v) {
   return isNaN(n) ? null : n;
 }
 
+function toBool(v) {
+  if (v === undefined || v === null || v === "") return null;
+  return v.trim().toLowerCase() === "true";
+}
+
 async function load() {
   try {
     const resp = await fetch(CSV_URL + "?t=" + Date.now());
@@ -265,6 +273,8 @@ async function load() {
       ema_position: r[idx.ema_position] || null,
       cycle_stage: toNum(r[idx.cycle_stage]),
       cycle_stage_label: r[idx.cycle_stage_label] || null,
+      low_liquidity: toBool(r[idx.low_liquidity]),
+      is_ready: toBool(r[idx.is_ready]),
     })).filter(r => r.ticker);
 
     // نبقي أحدث اكتشاف لكل رمز فقط
@@ -334,6 +344,8 @@ function card(r) {
   }).join("");
 
   const tags = [];
+  if (r.is_ready) tags.push(`<span class="tag good">✅ جاهز</span>`);
+  if (r.low_liquidity) tags.push(`<span class="tag warn">⚠️ سيولة منخفضة</span>`);
   if (r.ema_position) {
     tags.push(`<span class="tag ${r.ema_position.includes('أسفل') ? 'info' : r.ema_position.includes('أعلى') ? 'good' : ''}">${r.ema_position}</span>`);
   }
@@ -345,9 +357,9 @@ function card(r) {
   if (sl) tags.push(`<span class="tag ${sl.cls}">${sl.text}</span>`);
   if (r.touches !== null) tags.push(`<span class="tag">${r.touches} ملامسة</span>`);
   if (r.phoenix_score !== null) tags.push(`<span class="tag good">سكور ${r.phoenix_score.toFixed(1)}</span>`);
-  
+
   return `
-    <div class="card">
+    <div class="card ${r.is_ready ? 'ready' : ''}">
       <div class="card-top">
         <div>
           <div class="ticker">${r.ticker}</div>
