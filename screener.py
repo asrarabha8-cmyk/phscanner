@@ -17,8 +17,8 @@ those layers knows about the other (Clean Architecture).
 
 تحديث آخر: أضفنا حساب EMA وموضع السعر من المتوسطات، و"مرحلة دورة الدعم"،
 وخانة "Ready" (جاهز) اللي تتحقق فقط لو السهم مو سيولة منخفضة **و** الـRSI
-داخل النطاق المثالي حسب منهجية فيصل (22-29) -- بدون ما تكون فلتر استبعاد،
-بس علامة تلخيصية توضح الأسهم الأقرب للدخول فوراً.
+أقل من 29 (حسب منهجية فيصل) -- بدون ما تكون فلتر استبعاد، بس علامة
+تلخيصية توضح الأسهم الأقرب للدخول فوراً.
 
 ترتيب المراحل:
 1. الترشيح الأولي بالسعر/القيمة السوقية (NASDAQ Screener، مجاني وسريع)
@@ -30,7 +30,8 @@ those layers knows about the other (Clean Architecture).
    مع تصنيف الأسهم "القريبة من التأهل" (لأسباب غير السيولة) في قائمة منفصلة
 5. حفظ كل النتائج (رئيسية + قريبة) بسجل المتابعة الدائم على GitHub،
    مع خصائصها وقت الاكتشاف (RSI/ملامسات/شورت/سكور/وقف خسارة/EMA/مرحلة
-   الدورة) عشان نقدر لاحقًا نقارن خصائص الفائزين بالخاسرين إحصائيًا.
+   الدورة/السيولة/الجاهزية) عشان نقدر لاحقًا نقارن خصائص الفائزين
+   بالخاسرين إحصائيًا.
 """
 
 import logging
@@ -234,6 +235,8 @@ class Screener:
                     ema_position=r.ema_position,
                     cycle_stage=stage_num,
                     cycle_stage_label=stage_label,
+                    low_liquidity=r.low_liquidity,
+                    is_ready=r.is_ready,
                 )
             )
         for n in near_misses:
@@ -392,11 +395,11 @@ class Screener:
         scorer = PhoenixScorer(tolerance_pct=params.support_tolerance_pct)
         score = scorer.score(reverse_split, support_zone, volume_profile, rise_pct)
 
-        # -------- خانة "الجاهز": كل الشروط + RSI بالمنطقة المثالية --------
+        # -------- خانة "الجاهز": كل الشروط + RSI أقل من 29 --------
         is_ready = (
             not is_low_liquidity
             and rsi is not None
-            and params.ideal_rsi_min <= rsi <= params.ideal_rsi_max
+            and rsi < params.ideal_rsi_max
         )
 
         result = StockResult(
