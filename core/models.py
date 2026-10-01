@@ -33,9 +33,8 @@ class ScreenerParams:
     min_dollar_volume: float = 300_000
     max_results: int = 50
 
-    # نطاق RSI "المثالي" حسب منهجية فيصل -- يُستخدم فقط لتحديد خانة
-    # "الجاهز" (Ready)، مو كفلتر استبعاد حقيقي
-    ideal_rsi_min: float = 22.0
+    # حد RSI "المثالي" حسب منهجية فيصل -- يُستخدم فقط لتحديد خانة
+    # "الجاهز" (Ready): RSI أقل من هذا الرقم، مو فلتر استبعاد حقيقي
     ideal_rsi_max: float = 29.0
 
 
@@ -259,6 +258,8 @@ class TrackedStock:
     ema_position: Optional[str] = None
     cycle_stage: Optional[int] = None
     cycle_stage_label: Optional[str] = None
+    low_liquidity: Optional[bool] = None
+    is_ready: Optional[bool] = None
 
     @property
     def change_pct(self) -> Optional[float]:
@@ -296,4 +297,6 @@ class TrackedStock:
             "EMA": self.ema_position if self.ema_position is not None else "N/A",
             "Cycle Stage": self.cycle_stage if self.cycle_stage is not None else "N/A",
             "Cycle Stage Label": self.cycle_stage_label if self.cycle_stage_label is not None else "N/A",
+            "Low Liquidity": ("⚠️ نعم" if self.low_liquidity else "لا") if self.low_liquidity is not None else "N/A",
+            "Ready": ("✅ جاهز" if self.is_ready else "⏳ لا") if self.is_ready is not None else "N/A",
         }
