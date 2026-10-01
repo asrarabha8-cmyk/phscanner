@@ -46,6 +46,8 @@ _CSV_HEADERS = [
     "ema_position",
     "cycle_stage",
     "cycle_stage_label",
+    "low_liquidity",
+    "is_ready",
 ]
 
 
@@ -79,6 +81,12 @@ def _parse_optional_str(raw: Optional[str]) -> Optional[str]:
     if raw is None or raw == "":
         return None
     return raw
+
+
+def _parse_optional_bool(raw: Optional[str]) -> Optional[bool]:
+    if raw is None or raw == "":
+        return None
+    return raw.strip().lower() in ("true", "1", "yes")
 
 
 def read_tracked_stocks() -> List[TrackedStock]:
@@ -123,6 +131,8 @@ def read_tracked_stocks() -> List[TrackedStock]:
                     ema_position=_parse_optional_str(row.get("ema_position")),
                     cycle_stage=_parse_optional_int(row.get("cycle_stage")),
                     cycle_stage_label=_parse_optional_str(row.get("cycle_stage_label")),
+                    low_liquidity=_parse_optional_bool(row.get("low_liquidity")),
+                    is_ready=_parse_optional_bool(row.get("is_ready")),
                 )
             )
         return stocks
@@ -166,6 +176,16 @@ def write_tracked_stocks(stocks: List[TrackedStock], commit_message: str) -> boo
                     "cycle_stage": s.cycle_stage if s.cycle_stage is not None else "",
                     "cycle_stage_label": (
                         s.cycle_stage_label if s.cycle_stage_label is not None else ""
+                    ),
+                    "low_liquidity": (
+                        ("true" if s.low_liquidity else "false")
+                        if s.low_liquidity is not None
+                        else ""
+                    ),
+                    "is_ready": (
+                        ("true" if s.is_ready else "false")
+                        if s.is_ready is not None
+                        else ""
                     ),
                 }
             )
