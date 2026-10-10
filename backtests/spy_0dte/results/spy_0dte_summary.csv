@@ -1,0 +1,4 @@
+strategy,trades,win_rate,net_pnl,total_return,profit_factor,avg_win,avg_loss,max_dd,exits
+A_VWAP_EMA,192,50.0,-2295.16,-57.38,0.62,38.35,-62.25,-61.6,"{'TP': np.int64(96), 'SL': np.int64(55), 'VWAP': np.int64(39), 'TIME': np.int64(1), 'EOD': np.int64(1)}"
+B_QQE,196,48.0,-2031.62,-50.79,0.62,35.21,-52.36,-50.88,"{'TP': np.int64(84), 'VWAP': np.int64(57), 'SL': np.int64(55)}"
+C_COMBO,158,47.5,-2044.19,-51.1,0.58,38.32,-59.25,-52.97,"{'TP': np.int64(75), 'SL': np.int64(46), 'VWAP': np.int64(36), 'TIME': np.int64(1)}"
