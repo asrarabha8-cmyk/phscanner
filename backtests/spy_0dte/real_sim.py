@@ -15,11 +15,12 @@ _cache = {}
 def day_options(d):
     if d in _cache:
         return _cache[d]
-    f = f"{HERE}/data/options/{d}.csv"
-    if not os.path.exists(f):
+    import glob
+    files = glob.glob(f"{HERE}/data/options/{d}.csv") + glob.glob(f"{HERE}/data/options_t/{d}_*.csv")
+    if not files:
         _cache[d] = None
         return None
-    x = pd.read_csv(f)
+    x = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
     if len(x) == 0:
         _cache[d] = None
         return None
