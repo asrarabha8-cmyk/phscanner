@@ -33,7 +33,7 @@ jobs:
       - name: Save results to branch
         run: |
           mkdir -p backtests/spy_0dte/results
-          mv backtests/spy_0dte/spy_0dte_* backtests/spy_0dte/results/
+          mv backtests/spy_0dte/spy_0dte_summary.csv backtests/spy_0dte/spy_0dte_trades.csv backtests/spy_0dte/spy_0dte_equity.png backtests/spy_0dte/results/
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
           git add backtests/spy_0dte/results
