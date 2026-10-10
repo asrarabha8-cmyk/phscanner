@@ -30,3 +30,4 @@ if isinstance(v.columns, pd.MultiIndex):
     v.columns = v.columns.get_level_values(0)
 v[["Open", "Close"]].round(2).to_csv("data/vix_daily.csv")
 print("saved", len(d), "bars", d.index[0], d.index[-1])
+# rev2
