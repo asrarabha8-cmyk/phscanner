@@ -1,0 +1,32 @@
+name: SPY 0DTE Fetch Data
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [spy-0dte-backtest]
+    paths: ["backtests/spy_0dte/fetch_data.py"]
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install yfinance pandas requests
+      - name: Fetch
+        working-directory: backtests/spy_0dte
+        env:
+          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+        run: python fetch_data.py | tee data/fetch_log.txt
+      - name: Commit data
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add backtests/spy_0dte/data
+          git commit -m "SPY 5m + VIX data [skip ci]" || exit 0
+          git push

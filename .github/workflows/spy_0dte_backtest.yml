@@ -4,7 +4,7 @@ on:
   workflow_dispatch: {}
   push:
     branches: [spy-0dte-backtest]
-    paths: ["backtests/spy_0dte/**", ".github/workflows/spy_0dte_backtest.yml"]
+    paths: ["backtests/spy_0dte/spy_0dte_backtest.py", ".github/workflows/spy_0dte_backtest.yml"]
 
 permissions:
   contents: write
