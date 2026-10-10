@@ -4,7 +4,7 @@ on:
   workflow_dispatch: {}
   push:
     branches: [spy-0dte-backtest]
-    paths: ["backtests/spy_0dte/fetch_data.py"]
+    paths: ["backtests/spy_0dte/fetch_data.py", "backtests/spy_0dte/probe_options.py"]
 
 permissions:
   contents: write
@@ -25,7 +25,7 @@ jobs:
         run: |
           mkdir -p data
           set -o pipefail
-          python fetch_data.py 2>&1 | tee data/fetch_log.txt
+          python ${SCRIPT:-probe_options.py} 2>&1 | tee data/run_log.txt
       - name: Commit data
         if: always()
         run: |
