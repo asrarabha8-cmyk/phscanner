@@ -3,7 +3,7 @@ name: SPY 0DTE Options Data
 on:
   push:
     branches: [spy-0dte-backtest]
-    paths: ["backtests/spy_0dte/fetch_options.py", "backtests/spy_0dte/data/options/.continue"]
+    paths: ["backtests/spy_0dte/fetch_options.py", "backtests/spy_0dte/data/options/.continue", "backtests/spy_0dte/fetch_targets.py"]
 
 permissions:
   contents: write
@@ -32,5 +32,5 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
-          python fetch_options.py 2>&1 | tail -50 > data/options_log.txt || true
+          python ${{ contains(github.event.head_commit.message, '[targets]') && 'fetch_targets.py' || 'fetch_options.py' }} 2>&1 | tail -50 > data/options_log.txt || true
           git add data/options_log.txt; git commit -q -m "options log [skip ci]" && git pull -q --rebase && git push -q || true

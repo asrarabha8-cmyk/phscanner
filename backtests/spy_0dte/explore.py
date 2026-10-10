@@ -21,7 +21,7 @@ rows=[]; t0=time.time()
 for name,g in gens.items():
     E=g()
     for tp,sl,ex in itertools.product(*grid.values()):
-        tr=simulate(days,E,tp=tp,sl=sl,exit_t=ex)
+        tr=simulate(days,E,tp=tp,sl=sl,exit_t=ex,iv_mult=0.43)
         a,b=split(tr); m=metrics(a,name); m.update(tp=tp,sl=sl,ex=ex//60*100+ex%60)
         mb=metrics(b); m.update(test_n=mb.get("n"),test_pf=mb.get("pf"),test_avg=mb.get("avg_ret"))
         rows.append(m)

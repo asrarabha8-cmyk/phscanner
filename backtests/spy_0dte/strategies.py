@@ -119,3 +119,14 @@ def random_entries(days, seed=0, start=_hm(10, 0), end=_hm(14, 0)):
         idx = np.where((D["t"] >= start) & (D["t"] <= end))[0]
         E[di] = [(int(rng.choice(idx)), int(rng.choice([-1, 1])), None)]
     return E
+
+
+def orb_narrow(days, minutes=15, ratio=0.8, lookback=20, last_entry=12 * 60, stop="mid", only=None):
+    """ORB بشرط أن نطاق الافتتاح أضيق من متوسطه (ضغط قبل انفجار)"""
+    nb = minutes // 5
+    rng = np.array([(D["h"][:nb].max() - D["l"][:nb].min()) / D["o"][0] for D in days])
+    avg = np.full(len(days), np.nan)
+    for i in range(lookback, len(days)):
+        avg[i] = rng[i - lookback:i].mean()
+    base = orb(days, minutes, last_entry=last_entry, stop=stop, only=only)
+    return {di: l for di, l in base.items() if avg[di] == avg[di] and rng[di] < ratio * avg[di]}
