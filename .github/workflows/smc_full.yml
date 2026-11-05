@@ -1,0 +1,41 @@
+name: SMC Full Market
+
+on:
+  push:
+    branches: [smc-full-bt]
+    paths:
+      - research/smc_full/smc_full_test.py
+      - .github/workflows/smc_full.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install --quiet pandas numpy requests
+
+      - name: Run test
+        env:
+          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+        run: python research/smc_full/smc_full_test.py
+
+      - name: Save results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add research/smc_full
+          git diff --cached --quiet || git commit -m "Add SMC full market results"
+          git push
