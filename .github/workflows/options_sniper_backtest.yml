@@ -30,6 +30,7 @@ jobs:
       - name: Run backtest
         env:
           POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+          SNIPER_SYMBOLS: MSTR
         run: python research/options_sniper/sniper_test.py
 
       - name: Save results

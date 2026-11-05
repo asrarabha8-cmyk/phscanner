@@ -18,7 +18,9 @@ OUT = Path(__file__).parent
 sys.path.insert(0, str(OUT.parent / "noise_band"))
 import backtest as bt  # noqa: E402
 
-SYMBOLS = ("SPY", "QQQ", "AAPL", "MSFT", "NVDA", "AMZN", "META", "TSLA", "AMD", "GOOGL")
+DEFAULT_SYMBOLS = "SPY,QQQ,AAPL,MSFT,NVDA,AMZN,META,TSLA,AMD,GOOGL"
+SYMBOLS = tuple(os.environ.get("SNIPER_SYMBOLS", DEFAULT_SYMBOLS).split(","))
+SUFFIX = "" if len(SYMBOLS) > 1 else f"_{SYMBOLS[0]}"
 TIMEFRAMES = (3, 5, 15)
 COST_BPS = (1.0, 2.0, 5.0)
 MAIN_COST = 2.0
@@ -117,7 +119,7 @@ def main():
     if not os.environ.get("POLYGON_API_KEY", "").strip():
         raise SystemExit("POLYGON_API_KEY is missing")
     key = os.environ["POLYGON_API_KEY"].strip()
-    lines = ["# Options Sniper backtest", "", f"Run date: {date.today()}. Rules were fixed before the run.", ""]
+    lines = [f"# Options Sniper backtest{SUFFIX}", "", f"Run date: {date.today()}. Rules were fixed before the run.", ""]
     results = {}
     for tf in TIMEFRAMES:
         data = {}
@@ -144,10 +146,10 @@ def main():
         for c in COST_BPS:
             lines.append(bt.row_md(f"Cost {c} bps", bt.stats(run_all(data, c)["r"].reset_index(drop=True))))
         lines.append("")
-        t.to_csv(OUT / f"trades_{tf}m.csv", index=False)
+        t.to_csv(OUT / f"trades{SUFFIX}_{tf}m.csv", index=False)
         results[f"{tf}m"] = {"groups": res, "verdict": check}
-    (OUT / "results.json").write_text(json.dumps(results, indent=2, default=str))
-    (OUT / "results.md").write_text("\n".join(lines))
+    (OUT / f"results{SUFFIX}.json").write_text(json.dumps(results, indent=2, default=str))
+    (OUT / f"results{SUFFIX}.md").write_text("\n".join(lines))
     print("\n".join(lines))
 
 
