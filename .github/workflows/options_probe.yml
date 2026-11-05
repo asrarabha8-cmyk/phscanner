@@ -1,0 +1,36 @@
+name: Options Data Probe
+
+on:
+  push:
+    branches: [options-data-probe]
+    paths:
+      - research/options_probe/probe.py
+      - .github/workflows/options_probe.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install --quiet requests
+      - name: Run probe
+        env:
+          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+        run: python research/options_probe/probe.py
+      - name: Save results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add research/options_probe
+          git diff --cached --quiet || git commit -m "Add options data probe results"
+          git push
