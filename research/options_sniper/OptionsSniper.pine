@@ -1,0 +1,36 @@
+//@version=5
+indicator("Options Sniper (Volume + Momentum + VWAP)", overlay=true)
+
+// ===== Inputs =====
+volMultiplier = input.float(1.5, "Volume Spike Multiplier")
+length = input.int(20, "Resistance Lookback")
+riskReward = input.float(2.0, "Risk/Reward")
+
+// ===== Calculations =====
+avgVolume = ta.sma(volume, 20)
+volumeSpike = volume > avgVolume * volMultiplier
+
+resistance = ta.highest(high, length)
+breakout = close > resistance[1]
+
+vwap = ta.vwap(close)
+aboveVWAP = close > vwap
+
+momentum = close > ta.ema(close, 9)
+
+// ===== Entry Condition =====
+longCondition = breakout and volumeSpike and aboveVWAP and momentum
+
+// ===== Plot Signals =====
+plotshape(longCondition, title="BUY", location=location.belowbar,
+     color=color.green, style=shape.labelup, text="BUY")
+
+// ===== Stop Loss & Target =====
+stopLoss = low
+target = close + (close - stopLoss) * riskReward
+
+plot(longCondition ? stopLoss : na, color=color.red, style=plot.style_linebr, title="Stop Loss")
+plot(longCondition ? target : na, color=color.green, style=plot.style_linebr, title="Target")
+
+// ===== Alerts =====
+alertcondition(longCondition, title="Buy Alert", message="Breakout + Volume + VWAP Signal!")
