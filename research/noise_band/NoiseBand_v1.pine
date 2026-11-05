@@ -1,0 +1,231 @@
+// This Pine Script code is provided for research and paper testing only.
+//@version=6
+indicator("Noise Band v1 | نطاق الضجيج", shorttitle="NoiseBand", overlay=true, max_labels_count=100)
+
+// ───── الإعدادات ─────
+string G1 = "١) النطاق"
+int    look     = input.int(14, "عدد الأيام لحساب الحركة الطبيعية", minval=5, maxval=60, group=G1)
+float  bandMult = input.float(1.0, "مضاعف النطاق", minval=0.25, step=0.05, group=G1)
+
+string G2 = "٢) الدخول"
+int    startMin  = input.int(30, "لا دخول في أول كم دقيقة", minval=0, group=G2)
+int    noNewMin  = input.int(30, "لا دخول في آخر كم دقيقة", minval=0, group=G2)
+int    maxTrades = input.int(2, "أقصى عدد صفقات في اليوم", minval=1, group=G2)
+float  adrMax    = input.float(1.0, "أقصى مدى لليوم × المدى المعتاد", minval=0.25, step=0.05, group=G2)
+
+string G3 = "٣) الخروج والقياس"
+float  stopPad = input.float(0.25, "هامش الوقف خلف VWAP × ATR", minval=0, step=0.05, group=G3)
+float  minRisk = input.float(0.5, "أقل مسافة وقف × ATR", minval=0.1, step=0.1, group=G3)
+float  costPts = input.float(0.5, "تكلفة الصفقة (نقاط)", minval=0, step=0.1, tooltip="٠٫٥ مناسبة لـ SPX500. عدّلها لأي أصل آخر", group=G3)
+int    minN    = input.int(30, "أقل عدد صفقات للثقة", minval=5, group=G3)
+
+string G4 = "٤) العرض"
+bool   showTbl = input.bool(true, "إظهار الجدول", group=G4)
+string tblSize = input.string("صغير جدًا", "حجم الجدول", options=["صغير جدًا", "صغير", "عادي"], group=G4)
+
+// ───── الثوابت والسلاسل ─────
+const string TZ  = "America/New_York"
+const float  Z95 = 1.96
+
+float tfMin = timeframe.in_seconds() / 60.0
+int   nBins = int(math.ceil(390 / tfMin))
+string txtSize = tblSize == "عادي" ? size.normal : tblSize == "صغير" ? size.small : size.tiny
+
+float atrv = ta.atr(14)
+float adr  = request.security(syminfo.tickerid, "D", ta.atr(14)[1], lookahead=barmerge.lookahead_on)
+
+int  mins   = hour(time, TZ) * 60 + minute(time, TZ)
+bool inRTH  = mins >= 570 and mins < 960
+int  dayKey = year(time, TZ) * 10000 + month(time, TZ) * 100 + dayofmonth(time, TZ)
+int  bin    = inRTH ? math.min(int((mins - 570) / tfMin), nBins - 1) : -1
+
+// ───── الحالة ─────
+var matrix<float> hist = matrix.new<float>(look, nBins, na)
+var array<float>  cur  = array.new_float(nBins, na)
+var int   writeRow = 0
+var int   filled   = 0
+var int   curKey   = 0
+var float dayOpen  = na
+var float lastRth  = na
+var float prevC    = na
+var float dayHi    = na
+var float dayLo    = na
+var float cumPV    = 0.0
+var float cumV     = 0.0
+var float vw       = na
+var float upB      = na
+var float dnB      = na
+
+var int   pos    = 0
+var float entry  = na
+var float stop   = na
+var float risk   = na
+var int   today  = 0
+var bool  armL   = true
+var bool  armS   = true
+
+var array<int>   sN  = array.new_int(2, 0)      // 0 شراء، 1 بيع
+var array<int>   sW  = array.new_int(2, 0)
+var array<float> sR  = array.new_float(2, 0.0)
+var array<float> sR2 = array.new_float(2, 0.0)
+var float eq = 0.0
+var float peak = 0.0
+var float maxDD = 0.0
+var int   streak = 0
+var int   maxStreak = 0
+var float sumWin = 0.0
+var int   nWin = 0
+var float sumLoss = 0.0
+var int   nLoss = 0
+var int   tradedDays = 0
+
+avgBin(int b) =>
+    float s = 0.0
+    int n = 0
+    for r = 0 to look - 1
+        float v = hist.get(r, b)
+        if not na(v)
+            s += v
+            n += 1
+    n > 0 ? s / n : na
+
+bool enterL = false
+bool enterS = false
+bool exitNow = false
+
+// ───── منطق الشموع المغلقة داخل الجلسة ─────
+if barstate.isconfirmed and inRTH
+    if dayKey != curKey
+        if curKey != 0
+            for j = 0 to nBins - 1
+                hist.set(writeRow, j, cur.get(j))
+                cur.set(j, na)
+            writeRow := (writeRow + 1) % look
+            filled := math.min(filled + 1, look)
+            prevC := lastRth
+        curKey := dayKey
+        dayOpen := open
+        dayHi := high
+        dayLo := low
+        cumPV := 0.0
+        cumV := 0.0
+        today := 0
+        armL := true
+        armS := true
+        if filled >= look
+            tradedDays += 1
+
+    dayHi := math.max(dayHi, high)
+    dayLo := math.min(dayLo, low)
+    float w = nz(volume) > 0 ? volume : 1.0
+    cumPV += hlc3 * w
+    cumV += w
+    vw := cumPV / cumV
+    lastRth := close
+    cur.set(bin, math.abs(close / dayOpen - 1))
+
+    // النطاق مبني على الأيام المكتملة فقط
+    float sig = filled >= look ? avgBin(bin) * bandMult : na
+    float refHi = math.max(dayOpen, nz(prevC, dayOpen))
+    float refLo = math.min(dayOpen, nz(prevC, dayOpen))
+    upB := na(sig) ? na : refHi * (1 + sig)
+    dnB := na(sig) ? na : refLo * (1 - sig)
+
+    // الخروج: الوقف داخل الشمعة، ثم إغلاق خلف VWAP، ثم نهاية الجلسة
+    if pos != 0
+        bool hitStop = pos == 1 ? low <= stop : high >= stop
+        bool trail   = pos == 1 ? close < vw : close > vw
+        bool eod     = mins + tfMin >= 960
+        if hitStop or trail or eod
+            float px = hitStop ? stop : close
+            float r = (pos * (px - entry) - costPts) / risk
+            int k = pos == 1 ? 0 : 1
+            sN.set(k, sN.get(k) + 1)
+            sR.set(k, sR.get(k) + r)
+            sR2.set(k, sR2.get(k) + r * r)
+            if r > 0
+                sW.set(k, sW.get(k) + 1)
+                sumWin += r
+                nWin += 1
+                streak := 0
+            else
+                sumLoss += r
+                nLoss += 1
+                streak += 1
+                maxStreak := math.max(maxStreak, streak)
+            eq += r
+            peak := math.max(peak, eq)
+            maxDD := math.max(maxDD, peak - eq)
+            if pos == 1
+                armL := false
+            else
+                armS := false
+            pos := 0
+            exitNow := true
+
+    // لا إشارة جديدة بنفس الجهة قبل عودة السعر إلى داخل النطاق
+    if not na(upB) and close <= upB
+        armL := true
+    if not na(dnB) and close >= dnB
+        armS := true
+
+    // الدخول عند إغلاق الشمعة
+    bool timeOK  = mins >= 570 + startMin and mins < 960 - noNewMin
+    bool rangeOK = not na(adr) and dayHi - dayLo <= adrMax * adr
+    if pos == 0 and not exitNow and timeOK and rangeOK and today < maxTrades and not na(upB)
+        bool goL = close > upB and close > vw and armL
+        bool goS = close < dnB and close < vw and armS
+        if goL or goS
+            pos := goL ? 1 : -1
+            entry := close
+            float rawStop = goL ? vw - stopPad * atrv : vw + stopPad * atrv
+            risk := math.max(math.max(math.abs(close - rawStop), minRisk * atrv), syminfo.mintick)
+            stop := close - pos * risk
+            today += 1
+            enterL := goL
+            enterS := goS
+
+// ───── الرسم ─────
+plot(inRTH ? upB : na, "الحد العلوي", color=color.new(color.green, 20), style=plot.style_linebr)
+plot(inRTH ? dnB : na, "الحد السفلي", color=color.new(color.red, 20), style=plot.style_linebr)
+plot(inRTH ? vw : na, "VWAP", color=color.new(color.orange, 0), style=plot.style_linebr, linewidth=2)
+plot(pos != 0 ? stop : na, "الوقف", color=color.new(color.gray, 0), style=plot.style_linebr)
+plotshape(enterL, "شراء", shape.labelup, location.belowbar, color.new(color.green, 0), text="شراء", textcolor=color.white, size=size.tiny)
+plotshape(enterS, "بيع", shape.labeldown, location.abovebar, color.new(color.red, 0), text="بيع", textcolor=color.white, size=size.tiny)
+plotshape(exitNow, "خروج", shape.xcross, location.abovebar, color.new(color.gray, 0), size=size.tiny)
+
+// ───── الجدول ─────
+var table tb = table.new(position.top_right, 5, 6, bgcolor=color.new(color.black, 15), border_width=1, border_color=color.gray)
+
+cell5(int row, string a, string b, string c, string d, string e, color bg) =>
+    tb.cell(0, row, a, text_color=color.white, text_size=txtSize, bgcolor=bg)
+    tb.cell(1, row, b, text_color=color.white, text_size=txtSize, bgcolor=bg)
+    tb.cell(2, row, c, text_color=color.white, text_size=txtSize, bgcolor=bg)
+    tb.cell(3, row, d, text_color=color.white, text_size=txtSize, bgcolor=bg)
+    tb.cell(4, row, e, text_color=color.white, text_size=txtSize, bgcolor=bg)
+
+fmtR(float v) =>
+    na(v) ? "—" : str.tostring(v, "0.00") + "R"
+
+statRow(int row, string name, int n, int w, float rs, float rs2) =>
+    float er = n > 0 ? rs / n : na
+    float sd = n > 1 ? math.sqrt(math.max(rs2 / n - er * er, 0)) : na
+    float lo = n > 1 ? er - Z95 * sd / math.sqrt(n) : na
+    bool thin = n < minN
+    color bg = thin ? color.new(color.gray, 60) : lo > 0 ? color.new(color.green, 55) : er < 0 ? color.new(color.red, 60) : color.new(color.gray, 60)
+    string count = n == 0 ? "—" : thin ? str.tostring(n) + " قليل" : str.tostring(n)
+    cell5(row, name, count, n > 0 ? str.tostring(100.0 * w / n, "0") + "%" : "—", fmtR(er), fmtR(lo), bg)
+
+if barstate.islast and showTbl
+    color header = color.new(color.blue, 40)
+    cell5(0, "الجهة", "صفقات", "نجاح", "R/صفقة", "أقل R ٩٥٪", header)
+    statRow(1, "شراء", sN.get(0), sW.get(0), sR.get(0), sR2.get(0))
+    statRow(2, "بيع", sN.get(1), sW.get(1), sR.get(1), sR2.get(1))
+    statRow(3, "الكل", int(sN.sum()), int(sW.sum()), sR.sum(), sR2.sum())
+    cell5(4, "متوسط ربح", "متوسط خسارة", "أسوأ تتابع", "أقصى تراجع", "أيام", header)
+    cell5(5, nWin > 0 ? fmtR(sumWin / nWin) : "—", nLoss > 0 ? fmtR(sumLoss / nLoss) : "—", str.tostring(maxStreak), fmtR(maxDD), str.tostring(tradedDays), color.new(color.gray, 50))
+
+// ───── التنبيهات ─────
+alertcondition(enterL, "شراء", "NoiseBand: شراء على {{ticker}} عند {{close}}")
+alertcondition(enterS, "بيع", "NoiseBand: بيع على {{ticker}} عند {{close}}")
+alertcondition(exitNow, "خروج", "NoiseBand: خروج على {{ticker}} عند {{close}}")
