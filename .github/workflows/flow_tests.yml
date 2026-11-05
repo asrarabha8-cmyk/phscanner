@@ -1,0 +1,41 @@
+name: Flow Tests
+
+on:
+  push:
+    branches: [flow-tests-bt]
+    paths:
+      - research/flow_tests/flow_test.py
+      - .github/workflows/flow_tests.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install --quiet pandas numpy requests
+
+      - name: Run tests
+        env:
+          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+        run: python research/flow_tests/flow_test.py
+
+      - name: Save results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add research/flow_tests
+          git diff --cached --quiet || git commit -m "Add flow test results"
+          git push
