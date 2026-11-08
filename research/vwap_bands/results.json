@@ -1,0 +1,320 @@
+{
+  "revert_0": {
+    "groups": {
+      "Development": {
+        "n": 309,
+        "win": 35.6,
+        "avg_ret": -7.3,
+        "low95": -11.3,
+        "pnl": -3649,
+        "pf": 0.56
+      },
+      "Dev first half": {
+        "n": 154,
+        "win": 35.1,
+        "avg_ret": -7.8,
+        "low95": -12.8,
+        "pnl": -2136,
+        "pf": 0.51
+      },
+      "Dev second half": {
+        "n": 155,
+        "win": 36.1,
+        "avg_ret": -6.8,
+        "low95": -12.9,
+        "pnl": -1513,
+        "pf": 0.62
+      },
+      "Dev calls": {
+        "n": 150,
+        "win": 42.7,
+        "avg_ret": -4.2,
+        "low95": -9.4,
+        "pnl": -1127,
+        "pf": 0.7
+      },
+      "Dev puts": {
+        "n": 159,
+        "win": 28.9,
+        "avg_ret": -10.3,
+        "low95": -16.2,
+        "pnl": -2522,
+        "pf": 0.45
+      },
+      "Test": {
+        "n": 122,
+        "win": 34.4,
+        "avg_ret": -7.9,
+        "low95": -13.6,
+        "pnl": -1354,
+        "pf": 0.56
+      }
+    },
+    "passed": false
+  },
+  "breakout_0": {
+    "groups": {
+      "Development": {
+        "n": 297,
+        "win": 21.2,
+        "avg_ret": -6.2,
+        "low95": -13.0,
+        "pnl": -3940,
+        "pf": 0.63
+      },
+      "Dev first half": {
+        "n": 148,
+        "win": 23.0,
+        "avg_ret": -7.5,
+        "low95": -16.2,
+        "pnl": -2603,
+        "pf": 0.55
+      },
+      "Dev second half": {
+        "n": 149,
+        "win": 19.5,
+        "avg_ret": -5.0,
+        "low95": -15.4,
+        "pnl": -1337,
+        "pf": 0.73
+      },
+      "Dev calls": {
+        "n": 151,
+        "win": 21.9,
+        "avg_ret": -5.0,
+        "low95": -14.5,
+        "pnl": -1491,
+        "pf": 0.69
+      },
+      "Dev puts": {
+        "n": 146,
+        "win": 20.5,
+        "avg_ret": -7.5,
+        "low95": -17.3,
+        "pnl": -2449,
+        "pf": 0.59
+      },
+      "Test": {
+        "n": 116,
+        "win": 26.7,
+        "avg_ret": -7.1,
+        "low95": -14.1,
+        "pnl": -1407,
+        "pf": 0.56
+      }
+    },
+    "passed": false
+  },
+  "revert_1": {
+    "groups": {
+      "Development": {
+        "n": 309,
+        "win": 34.0,
+        "avg_ret": -4.5,
+        "low95": -6.4,
+        "pnl": -4449,
+        "pf": 0.48
+      },
+      "Dev first half": {
+        "n": 154,
+        "win": 33.8,
+        "avg_ret": -4.8,
+        "low95": -7.3,
+        "pnl": -2513,
+        "pf": 0.45
+      },
+      "Dev second half": {
+        "n": 155,
+        "win": 34.2,
+        "avg_ret": -4.2,
+        "low95": -6.9,
+        "pnl": -1936,
+        "pf": 0.53
+      },
+      "Dev calls": {
+        "n": 150,
+        "win": 42.0,
+        "avg_ret": -2.9,
+        "low95": -5.4,
+        "pnl": -1421,
+        "pf": 0.62
+      },
+      "Dev puts": {
+        "n": 159,
+        "win": 26.4,
+        "avg_ret": -6.0,
+        "low95": -8.7,
+        "pnl": -3027,
+        "pf": 0.38
+      },
+      "Test": {
+        "n": 122,
+        "win": 36.1,
+        "avg_ret": -4.5,
+        "low95": -7.4,
+        "pnl": -1517,
+        "pf": 0.51
+      }
+    },
+    "passed": false
+  },
+  "breakout_1": {
+    "groups": {
+      "Development": {
+        "n": 297,
+        "win": 23.2,
+        "avg_ret": -4.4,
+        "low95": -7.7,
+        "pnl": -4956,
+        "pf": 0.56
+      },
+      "Dev first half": {
+        "n": 148,
+        "win": 24.3,
+        "avg_ret": -5.5,
+        "low95": -9.8,
+        "pnl": -3305,
+        "pf": 0.46
+      },
+      "Dev second half": {
+        "n": 149,
+        "win": 22.1,
+        "avg_ret": -3.3,
+        "low95": -8.2,
+        "pnl": -1651,
+        "pf": 0.68
+      },
+      "Dev calls": {
+        "n": 151,
+        "win": 25.8,
+        "avg_ret": -3.0,
+        "low95": -7.3,
+        "pnl": -1761,
+        "pf": 0.64
+      },
+      "Dev puts": {
+        "n": 146,
+        "win": 20.5,
+        "avg_ret": -6.0,
+        "low95": -10.8,
+        "pnl": -3195,
+        "pf": 0.5
+      },
+      "Test": {
+        "n": 116,
+        "win": 32.8,
+        "avg_ret": -4.1,
+        "low95": -7.4,
+        "pnl": -1457,
+        "pf": 0.54
+      }
+    },
+    "passed": false
+  },
+  "revert_5": {
+    "groups": {
+      "Development": {
+        "n": 304,
+        "win": 28.6,
+        "avg_ret": -3.0,
+        "low95": -4.0,
+        "pnl": -6000,
+        "pf": 0.37
+      },
+      "Dev first half": {
+        "n": 152,
+        "win": 28.9,
+        "avg_ret": -3.3,
+        "low95": -4.7,
+        "pnl": -3460,
+        "pf": 0.32
+      },
+      "Dev second half": {
+        "n": 152,
+        "win": 28.3,
+        "avg_ret": -2.7,
+        "low95": -4.0,
+        "pnl": -2541,
+        "pf": 0.42
+      },
+      "Dev calls": {
+        "n": 147,
+        "win": 32.0,
+        "avg_ret": -2.4,
+        "low95": -3.6,
+        "pnl": -2285,
+        "pf": 0.44
+      },
+      "Dev puts": {
+        "n": 157,
+        "win": 25.5,
+        "avg_ret": -3.6,
+        "low95": -5.1,
+        "pnl": -3715,
+        "pf": 0.31
+      },
+      "Test": {
+        "n": 117,
+        "win": 30.8,
+        "avg_ret": -3.5,
+        "low95": -4.9,
+        "pnl": -2378,
+        "pf": 0.33
+      }
+    },
+    "passed": false
+  },
+  "breakout_5": {
+    "groups": {
+      "Development": {
+        "n": 292,
+        "win": 23.3,
+        "avg_ret": -3.3,
+        "low95": -4.8,
+        "pnl": -6098,
+        "pf": 0.47
+      },
+      "Dev first half": {
+        "n": 146,
+        "win": 23.3,
+        "avg_ret": -4.4,
+        "low95": -6.2,
+        "pnl": -4102,
+        "pf": 0.32
+      },
+      "Dev second half": {
+        "n": 146,
+        "win": 23.3,
+        "avg_ret": -2.2,
+        "low95": -4.6,
+        "pnl": -1996,
+        "pf": 0.64
+      },
+      "Dev calls": {
+        "n": 148,
+        "win": 25.0,
+        "avg_ret": -2.4,
+        "low95": -4.0,
+        "pnl": -2018,
+        "pf": 0.57
+      },
+      "Dev puts": {
+        "n": 144,
+        "win": 21.5,
+        "avg_ret": -4.4,
+        "low95": -6.8,
+        "pnl": -4081,
+        "pf": 0.41
+      },
+      "Test": {
+        "n": 112,
+        "win": 31.2,
+        "avg_ret": -2.8,
+        "low95": -4.5,
+        "pnl": -1869,
+        "pf": 0.46
+      }
+    },
+    "passed": false
+  }
+}
