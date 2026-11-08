@@ -1,0 +1,78 @@
+name: VWAP Bands Options
+
+on:
+  push:
+    branches: [vwap-bands-bt]
+    paths:
+      - research/vwap_bands/bands_test.py
+      - .github/workflows/vwap_bands.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vwap-bands
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      max-parallel: 1
+      matrix:
+        dte: [0, 1, 5]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: git pull --rebase origin vwap-bands-bt
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install --quiet pandas numpy requests
+      - name: Fetch contracts
+        env:
+          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+          MODE: fetch
+          DTE: ${{ matrix.dte }}
+        run: python research/vwap_bands/bands_test.py
+      - name: Save cache
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add research/vwap_bands/cache || true
+          git diff --cached --quiet || git commit -m "Add option bars for expiry ${{ matrix.dte }}"
+          git pull --rebase origin vwap-bands-bt && git push origin HEAD:vwap-bands-bt
+
+  analyze:
+    needs: fetch
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: git pull --rebase origin vwap-bands-bt
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install --quiet pandas numpy requests
+      - name: Analyze
+        env:
+          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+        run: python research/vwap_bands/bands_test.py
+      - name: Save results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add research/vwap_bands
+          git diff --cached --quiet || git commit -m "Add VWAP bands results"
+          git pull --rebase origin vwap-bands-bt && git push origin HEAD:vwap-bands-bt
