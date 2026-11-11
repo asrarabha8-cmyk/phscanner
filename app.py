@@ -145,7 +145,7 @@ with tab_scan:
             "Min shares outstanding", min_value=0.0, value=200_000.0, step=100_000.0
         )
         max_shares_outstanding = st.number_input(
-            "Max shares outstanding", min_value=0.0, value=8_000_000.0, step=100_000.0
+            "Max shares outstanding", min_value=0.0, value=900_000.0, step=100_000.0
         )
 
         max_results = st.slider("Max results shown", 10, 100, 50, step=10)
