@@ -29,7 +29,7 @@ class ScreenerParams:
     min_price: float = 1.0
     max_market_cap: float = 300_000_000
     min_shares_outstanding: float = 200_000
-    max_shares_outstanding: float = 8_000_000
+    max_shares_outstanding: float = 900_000
     min_dollar_volume: float = 300_000
     max_results: int = 50
 
