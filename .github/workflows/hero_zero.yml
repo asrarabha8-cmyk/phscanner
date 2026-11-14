@@ -1,0 +1,78 @@
+name: Hero Zero Options
+
+on:
+  push:
+    branches: [hero-zero-bt]
+    paths:
+      - research/hero_zero/hero_test.py
+      - .github/workflows/vwap_bands.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hero-zero
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      max-parallel: 1
+      matrix:
+        kind: [atm, otm]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: git pull --rebase origin hero-zero-bt
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install --quiet pandas numpy requests
+      - name: Fetch contracts
+        env:
+          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+          MODE: fetch
+          KIND: ${{ matrix.kind }}
+        run: python research/hero_zero/hero_test.py
+      - name: Save cache
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add research/hero_zero/cache || true
+          git diff --cached --quiet || git commit -m "Add option bars for ${{ matrix.kind }}"
+          git pull --rebase origin hero-zero-bt && git push origin HEAD:hero-zero-bt
+
+  analyze:
+    needs: fetch
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: git pull --rebase origin hero-zero-bt
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install --quiet pandas numpy requests
+      - name: Analyze
+        env:
+          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+        run: python research/hero_zero/hero_test.py
+      - name: Save results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add research/hero_zero
+          git diff --cached --quiet || git commit -m "Add Hero Zero results"
+          git pull --rebase origin hero-zero-bt && git push origin HEAD:hero-zero-bt
