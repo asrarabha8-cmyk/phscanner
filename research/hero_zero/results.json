@@ -1,0 +1,682 @@
+{
+  "continuation / atm / hold": {
+    "groups": {
+      "Development": {
+        "n": 336,
+        "win": 36.6,
+        "avg_ret": -0.4,
+        "low95": -12.5,
+        "pnl": -1350,
+        "pf": 0.85,
+        "best": 396,
+        "avg_prem": 0.61
+      },
+      "Dev first half": {
+        "n": 168,
+        "win": 38.1,
+        "avg_ret": 3.3,
+        "low95": -15.2,
+        "pnl": -823,
+        "pf": 0.84,
+        "best": 396,
+        "avg_prem": 0.66
+      },
+      "Dev second half": {
+        "n": 168,
+        "win": 35.1,
+        "avg_ret": -4.2,
+        "low95": -19.7,
+        "pnl": -527,
+        "pf": 0.86,
+        "best": 269,
+        "avg_prem": 0.56
+      },
+      "Dev calls": {
+        "n": 149,
+        "win": 38.9,
+        "avg_ret": 10.5,
+        "low95": -9.6,
+        "pnl": 88,
+        "pf": 1.02,
+        "best": 396,
+        "avg_prem": 0.61
+      },
+      "Dev puts": {
+        "n": 187,
+        "win": 34.8,
+        "avg_ret": -9.1,
+        "low95": -23.7,
+        "pnl": -1438,
+        "pf": 0.73,
+        "best": 219,
+        "avg_prem": 0.61
+      },
+      "Dev strong move": {
+        "n": 85,
+        "win": 37.6,
+        "avg_ret": -5.3,
+        "low95": -27.2,
+        "pnl": -972,
+        "pf": 0.71,
+        "best": 269,
+        "avg_prem": 0.88
+      },
+      "Test": {
+        "n": 137,
+        "win": 33.6,
+        "avg_ret": -14.0,
+        "low95": -28.9,
+        "pnl": -773,
+        "pf": 0.76,
+        "best": 300,
+        "avg_prem": 0.59
+      },
+      "Test strong move": {
+        "n": 16,
+        "win": 31.2,
+        "avg_ret": -15.2,
+        "low95": -58.9,
+        "pnl": -248,
+        "pf": 0.59,
+        "best": 115,
+        "avg_prem": 0.91
+      }
+    },
+    "passed": false
+  },
+  "continuation / atm / double": {
+    "groups": {
+      "Development": {
+        "n": 336,
+        "win": 40.8,
+        "avg_ret": -3.8,
+        "low95": -13.3,
+        "pnl": -1822,
+        "pf": 0.79,
+        "best": 238,
+        "avg_prem": 0.61
+      },
+      "Dev first half": {
+        "n": 168,
+        "win": 42.3,
+        "avg_ret": -3.8,
+        "low95": -17.5,
+        "pnl": -1260,
+        "pf": 0.75,
+        "best": 238,
+        "avg_prem": 0.66
+      },
+      "Dev second half": {
+        "n": 168,
+        "win": 39.3,
+        "avg_ret": -3.8,
+        "low95": -17.0,
+        "pnl": -562,
+        "pf": 0.85,
+        "best": 210,
+        "avg_prem": 0.56
+      },
+      "Dev calls": {
+        "n": 149,
+        "win": 43.6,
+        "avg_ret": 4.2,
+        "low95": -10.1,
+        "pnl": -360,
+        "pf": 0.9,
+        "best": 210,
+        "avg_prem": 0.61
+      },
+      "Dev puts": {
+        "n": 187,
+        "win": 38.5,
+        "avg_ret": -10.2,
+        "low95": -22.9,
+        "pnl": -1462,
+        "pf": 0.72,
+        "best": 238,
+        "avg_prem": 0.61
+      },
+      "Dev strong move": {
+        "n": 85,
+        "win": 40.0,
+        "avg_ret": -4.6,
+        "low95": -24.1,
+        "pnl": -786,
+        "pf": 0.76,
+        "best": 238,
+        "avg_prem": 0.88
+      },
+      "Test": {
+        "n": 137,
+        "win": 41.6,
+        "avg_ret": -2.8,
+        "low95": -17.3,
+        "pnl": -432,
+        "pf": 0.86,
+        "best": 184,
+        "avg_prem": 0.59
+      },
+      "Test strong move": {
+        "n": 16,
+        "win": 43.8,
+        "avg_ret": -0.2,
+        "low95": -42.9,
+        "pnl": -192,
+        "pf": 0.66,
+        "best": 85,
+        "avg_prem": 0.91
+      }
+    },
+    "passed": false
+  },
+  "reversal / atm / hold": {
+    "groups": {
+      "Development": {
+        "n": 336,
+        "win": 32.1,
+        "avg_ret": -12.1,
+        "low95": -23.1,
+        "pnl": -2028,
+        "pf": 0.78,
+        "best": 471,
+        "avg_prem": 0.62
+      },
+      "Dev first half": {
+        "n": 168,
+        "win": 33.9,
+        "avg_ret": -6.4,
+        "low95": -23.2,
+        "pnl": -536,
+        "pf": 0.9,
+        "best": 471,
+        "avg_prem": 0.69
+      },
+      "Dev second half": {
+        "n": 168,
+        "win": 30.4,
+        "avg_ret": -17.7,
+        "low95": -32.2,
+        "pnl": -1492,
+        "pf": 0.63,
+        "best": 181,
+        "avg_prem": 0.55
+      },
+      "Dev calls": {
+        "n": 187,
+        "win": 33.7,
+        "avg_ret": -8.0,
+        "low95": -23.6,
+        "pnl": -643,
+        "pf": 0.87,
+        "best": 315,
+        "avg_prem": 0.62
+      },
+      "Dev puts": {
+        "n": 149,
+        "win": 30.2,
+        "avg_ret": -17.1,
+        "low95": -32.6,
+        "pnl": -1385,
+        "pf": 0.67,
+        "best": 471,
+        "avg_prem": 0.62
+      },
+      "Dev strong move": {
+        "n": 85,
+        "win": 31.8,
+        "avg_ret": -9.9,
+        "low95": -31.3,
+        "pnl": -705,
+        "pf": 0.8,
+        "best": 471,
+        "avg_prem": 0.91
+      },
+      "Test": {
+        "n": 137,
+        "win": 38.0,
+        "avg_ret": 3.1,
+        "low95": -13.6,
+        "pnl": -477,
+        "pf": 0.84,
+        "best": 255,
+        "avg_prem": 0.57
+      },
+      "Test strong move": {
+        "n": 16,
+        "win": 43.8,
+        "avg_ret": 10.2,
+        "low95": -42.6,
+        "pnl": 9,
+        "pf": 1.02,
+        "best": 255,
+        "avg_prem": 0.8
+      }
+    },
+    "passed": false
+  },
+  "reversal / atm / double": {
+    "groups": {
+      "Development": {
+        "n": 336,
+        "win": 36.0,
+        "avg_ret": -12.9,
+        "low95": -21.9,
+        "pnl": -2264,
+        "pf": 0.75,
+        "best": 237,
+        "avg_prem": 0.62
+      },
+      "Dev first half": {
+        "n": 168,
+        "win": 38.1,
+        "avg_ret": -8.5,
+        "low95": -21.8,
+        "pnl": -866,
+        "pf": 0.83,
+        "best": 237,
+        "avg_prem": 0.69
+      },
+      "Dev second half": {
+        "n": 168,
+        "win": 33.9,
+        "avg_ret": -17.2,
+        "low95": -29.3,
+        "pnl": -1399,
+        "pf": 0.65,
+        "best": 144,
+        "avg_prem": 0.55
+      },
+      "Dev calls": {
+        "n": 187,
+        "win": 37.4,
+        "avg_ret": -12.3,
+        "low95": -24.3,
+        "pnl": -922,
+        "pf": 0.81,
+        "best": 237,
+        "avg_prem": 0.62
+      },
+      "Dev puts": {
+        "n": 149,
+        "win": 34.2,
+        "avg_ret": -13.6,
+        "low95": -27.2,
+        "pnl": -1342,
+        "pf": 0.67,
+        "best": 220,
+        "avg_prem": 0.62
+      },
+      "Dev strong move": {
+        "n": 85,
+        "win": 34.1,
+        "avg_ret": -12.4,
+        "low95": -30.7,
+        "pnl": -765,
+        "pf": 0.78,
+        "best": 237,
+        "avg_prem": 0.91
+      },
+      "Test": {
+        "n": 137,
+        "win": 38.7,
+        "avg_ret": -1.0,
+        "low95": -14.3,
+        "pnl": -617,
+        "pf": 0.78,
+        "best": 111,
+        "avg_prem": 0.57
+      },
+      "Test strong move": {
+        "n": 16,
+        "win": 43.8,
+        "avg_ret": 2.8,
+        "low95": -36.2,
+        "pnl": -79,
+        "pf": 0.84,
+        "best": 96,
+        "avg_prem": 0.8
+      }
+    },
+    "passed": false
+  },
+  "continuation / otm / hold": {
+    "groups": {
+      "Development": {
+        "n": 305,
+        "win": 24.3,
+        "avg_ret": -15.1,
+        "low95": -32.2,
+        "pnl": -1802,
+        "pf": 0.65,
+        "best": 342,
+        "avg_prem": 0.3
+      },
+      "Dev first half": {
+        "n": 152,
+        "win": 24.3,
+        "avg_ret": -12.2,
+        "low95": -37.6,
+        "pnl": -1028,
+        "pf": 0.67,
+        "best": 342,
+        "avg_prem": 0.34
+      },
+      "Dev second half": {
+        "n": 153,
+        "win": 24.2,
+        "avg_ret": -17.9,
+        "low95": -40.9,
+        "pnl": -773,
+        "pf": 0.64,
+        "best": 205,
+        "avg_prem": 0.25
+      },
+      "Dev calls": {
+        "n": 124,
+        "win": 27.4,
+        "avg_ret": 2.1,
+        "low95": -29.6,
+        "pnl": -271,
+        "pf": 0.86,
+        "best": 342,
+        "avg_prem": 0.31
+      },
+      "Dev puts": {
+        "n": 181,
+        "win": 22.1,
+        "avg_ret": -26.9,
+        "low95": -45.7,
+        "pnl": -1531,
+        "pf": 0.52,
+        "best": 171,
+        "avg_prem": 0.29
+      },
+      "Dev strong move": {
+        "n": 85,
+        "win": 23.5,
+        "avg_ret": -13.1,
+        "low95": -44.7,
+        "pnl": -1103,
+        "pf": 0.53,
+        "best": 205,
+        "avg_prem": 0.5
+      },
+      "Test": {
+        "n": 131,
+        "win": 19.1,
+        "avg_ret": -30.4,
+        "low95": -48.1,
+        "pnl": -546,
+        "pf": 0.68,
+        "best": 208,
+        "avg_prem": 0.26
+      },
+      "Test strong move": {
+        "n": 16,
+        "win": 25.0,
+        "avg_ret": -21.2,
+        "low95": -72.7,
+        "pnl": -199,
+        "pf": 0.48,
+        "best": 68,
+        "avg_prem": 0.51
+      }
+    },
+    "passed": false
+  },
+  "continuation / otm / double": {
+    "groups": {
+      "Development": {
+        "n": 305,
+        "win": 33.4,
+        "avg_ret": -18.9,
+        "low95": -29.7,
+        "pnl": -1803,
+        "pf": 0.63,
+        "best": 192,
+        "avg_prem": 0.3
+      },
+      "Dev first half": {
+        "n": 152,
+        "win": 34.2,
+        "avg_ret": -20.4,
+        "low95": -34.9,
+        "pnl": -1170,
+        "pf": 0.59,
+        "best": 192,
+        "avg_prem": 0.34
+      },
+      "Dev second half": {
+        "n": 153,
+        "win": 32.7,
+        "avg_ret": -17.3,
+        "low95": -33.5,
+        "pnl": -633,
+        "pf": 0.68,
+        "best": 167,
+        "avg_prem": 0.25
+      },
+      "Dev calls": {
+        "n": 124,
+        "win": 38.7,
+        "avg_ret": -6.8,
+        "low95": -24.7,
+        "pnl": -421,
+        "pf": 0.77,
+        "best": 190,
+        "avg_prem": 0.31
+      },
+      "Dev puts": {
+        "n": 181,
+        "win": 29.8,
+        "avg_ret": -27.2,
+        "low95": -40.6,
+        "pnl": -1382,
+        "pf": 0.54,
+        "best": 192,
+        "avg_prem": 0.29
+      },
+      "Dev strong move": {
+        "n": 85,
+        "win": 34.1,
+        "avg_ret": -10.4,
+        "low95": -31.9,
+        "pnl": -635,
+        "pf": 0.71,
+        "best": 192,
+        "avg_prem": 0.5
+      },
+      "Test": {
+        "n": 131,
+        "win": 30.5,
+        "avg_ret": -19.0,
+        "low95": -34.0,
+        "pnl": -502,
+        "pf": 0.67,
+        "best": 116,
+        "avg_prem": 0.26
+      },
+      "Test strong move": {
+        "n": 16,
+        "win": 43.8,
+        "avg_ret": -5.8,
+        "low95": -46.2,
+        "pnl": -174,
+        "pf": 0.5,
+        "best": 64,
+        "avg_prem": 0.51
+      }
+    },
+    "passed": false
+  },
+  "reversal / otm / hold": {
+    "groups": {
+      "Development": {
+        "n": 294,
+        "win": 21.1,
+        "avg_ret": -30.9,
+        "low95": -44.0,
+        "pnl": -1397,
+        "pf": 0.72,
+        "best": 437,
+        "avg_prem": 0.3
+      },
+      "Dev first half": {
+        "n": 147,
+        "win": 24.5,
+        "avg_ret": -20.4,
+        "low95": -41.0,
+        "pnl": -323,
+        "pf": 0.89,
+        "best": 437,
+        "avg_prem": 0.37
+      },
+      "Dev second half": {
+        "n": 147,
+        "win": 17.7,
+        "avg_ret": -41.4,
+        "low95": -57.4,
+        "pnl": -1073,
+        "pf": 0.46,
+        "best": 119,
+        "avg_prem": 0.24
+      },
+      "Dev calls": {
+        "n": 158,
+        "win": 26.6,
+        "avg_ret": -24.7,
+        "low95": -42.8,
+        "pnl": -558,
+        "pf": 0.79,
+        "best": 319,
+        "avg_prem": 0.3
+      },
+      "Dev puts": {
+        "n": 136,
+        "win": 14.7,
+        "avg_ret": -38.2,
+        "low95": -56.9,
+        "pnl": -839,
+        "pf": 0.64,
+        "best": 437,
+        "avg_prem": 0.31
+      },
+      "Dev strong move": {
+        "n": 85,
+        "win": 27.1,
+        "avg_ret": -16.5,
+        "low95": -43.0,
+        "pnl": -488,
+        "pf": 0.78,
+        "best": 437,
+        "avg_prem": 0.5
+      },
+      "Test": {
+        "n": 129,
+        "win": 21.7,
+        "avg_ret": -19.5,
+        "low95": -39.1,
+        "pnl": -879,
+        "pf": 0.48,
+        "best": 176,
+        "avg_prem": 0.25
+      },
+      "Test strong move": {
+        "n": 16,
+        "win": 31.2,
+        "avg_ret": -3.8,
+        "low95": -68.3,
+        "pnl": -95,
+        "pf": 0.7,
+        "best": 176,
+        "avg_prem": 0.42
+      }
+    },
+    "passed": false
+  },
+  "reversal / otm / double": {
+    "groups": {
+      "Development": {
+        "n": 294,
+        "win": 28.9,
+        "avg_ret": -28.5,
+        "low95": -38.9,
+        "pnl": -1458,
+        "pf": 0.68,
+        "best": 227,
+        "avg_prem": 0.3
+      },
+      "Dev first half": {
+        "n": 147,
+        "win": 30.6,
+        "avg_ret": -22.7,
+        "low95": -38.1,
+        "pnl": -711,
+        "pf": 0.75,
+        "best": 227,
+        "avg_prem": 0.37
+      },
+      "Dev second half": {
+        "n": 147,
+        "win": 27.2,
+        "avg_ret": -34.3,
+        "low95": -48.3,
+        "pnl": -746,
+        "pf": 0.59,
+        "best": 120,
+        "avg_prem": 0.24
+      },
+      "Dev calls": {
+        "n": 158,
+        "win": 32.9,
+        "avg_ret": -21.3,
+        "low95": -36.6,
+        "pnl": -431,
+        "pf": 0.82,
+        "best": 227,
+        "avg_prem": 0.3
+      },
+      "Dev puts": {
+        "n": 136,
+        "win": 24.3,
+        "avg_ret": -36.8,
+        "low95": -50.5,
+        "pnl": -1027,
+        "pf": 0.53,
+        "best": 177,
+        "avg_prem": 0.31
+      },
+      "Dev strong move": {
+        "n": 85,
+        "win": 36.5,
+        "avg_ret": -12.8,
+        "low95": -33.8,
+        "pnl": -330,
+        "pf": 0.84,
+        "best": 227,
+        "avg_prem": 0.5
+      },
+      "Test": {
+        "n": 129,
+        "win": 29.5,
+        "avg_ret": -19.8,
+        "low95": -34.1,
+        "pnl": -837,
+        "pf": 0.47,
+        "best": 64,
+        "avg_prem": 0.25
+      },
+      "Test strong move": {
+        "n": 16,
+        "win": 37.5,
+        "avg_ret": -13.3,
+        "low95": -52.9,
+        "pnl": -139,
+        "pf": 0.54,
+        "best": 64,
+        "avg_prem": 0.42
+      }
+    },
+    "passed": false
+  }
+}
