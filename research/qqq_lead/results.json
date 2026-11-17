@@ -1,0 +1,234 @@
+{
+  "part_a": {
+    "f30:Loose rule, development": {
+      "days": 991,
+      "obs": 5946,
+      "avg_bps": 0.68,
+      "low95": 0.05,
+      "high95": 1.31,
+      "hit": 51.3
+    },
+    "f30:Loose rule, dev first half": {
+      "days": 495,
+      "obs": 2970,
+      "avg_bps": 0.96,
+      "low95": -0.01,
+      "high95": 1.93,
+      "hit": 52.1
+    },
+    "f30:Loose rule, dev second half": {
+      "days": 496,
+      "obs": 2976,
+      "avg_bps": 0.4,
+      "low95": -0.4,
+      "high95": 1.2,
+      "hit": 50.5
+    },
+    "f30:Loose rule, holdout": {
+      "days": 249,
+      "obs": 1494,
+      "avg_bps": -0.31,
+      "low95": -1.13,
+      "high95": 0.51,
+      "hit": 48.9
+    },
+    "f30:Strict rule, development": {
+      "days": 930,
+      "obs": 4019,
+      "avg_bps": -0.65,
+      "low95": -1.57,
+      "high95": 0.27,
+      "hit": 52.3
+    },
+    "f30:Strict rule, holdout": {
+      "days": 235,
+      "obs": 1024,
+      "avg_bps": -2.0,
+      "low95": -3.39,
+      "high95": -0.61,
+      "hit": 49.1
+    },
+    "f30:SPY own move, development": {
+      "days": 991,
+      "obs": 5935,
+      "avg_bps": 0.37,
+      "low95": -0.26,
+      "high95": 0.99,
+      "hit": 51.8
+    },
+    "f30:SPY own move, holdout": {
+      "days": 249,
+      "obs": 1494,
+      "avg_bps": -0.39,
+      "low95": -1.25,
+      "high95": 0.48,
+      "hit": 49.8
+    },
+    "f30:Disagree subset, development": {
+      "days": 667,
+      "obs": 1927,
+      "avg_bps": 1.58,
+      "low95": 0.15,
+      "high95": 3.0,
+      "hit": 49.2
+    },
+    "f30:Disagree subset, holdout": {
+      "days": 156,
+      "obs": 470,
+      "avg_bps": 1.4,
+      "low95": -0.75,
+      "high95": 3.55,
+      "hit": 48.3
+    },
+    "f30:Lead >= 0.10%, development": {
+      "days": 959,
+      "obs": 4537,
+      "avg_bps": -0.01,
+      "low95": -0.8,
+      "high95": 0.78,
+      "hit": 52.0
+    },
+    "f30:Lead >= 0.10%, holdout": {
+      "days": 238,
+      "obs": 1128,
+      "avg_bps": -0.81,
+      "low95": -1.83,
+      "high95": 0.2,
+      "hit": 50.0
+    },
+    "feod:Loose rule, development": {
+      "days": 991,
+      "obs": 5946,
+      "avg_bps": 4.68,
+      "low95": 1.79,
+      "high95": 7.56,
+      "hit": 53.9
+    },
+    "feod:Loose rule, dev first half": {
+      "days": 495,
+      "obs": 2970,
+      "avg_bps": 6.78,
+      "low95": 2.57,
+      "high95": 10.99,
+      "hit": 55.7
+    },
+    "feod:Loose rule, dev second half": {
+      "days": 496,
+      "obs": 2976,
+      "avg_bps": 2.58,
+      "low95": -1.36,
+      "high95": 6.52,
+      "hit": 52.0
+    },
+    "feod:Loose rule, holdout": {
+      "days": 249,
+      "obs": 1494,
+      "avg_bps": 2.31,
+      "low95": -1.44,
+      "high95": 6.05,
+      "hit": 51.7
+    },
+    "feod:Strict rule, development": {
+      "days": 930,
+      "obs": 4019,
+      "avg_bps": -0.08,
+      "low95": -3.32,
+      "high95": 3.16,
+      "hit": 54.6
+    },
+    "feod:Strict rule, holdout": {
+      "days": 235,
+      "obs": 1024,
+      "avg_bps": -3.01,
+      "low95": -7.38,
+      "high95": 1.36,
+      "hit": 49.9
+    },
+    "feod:SPY own move, development": {
+      "days": 991,
+      "obs": 5935,
+      "avg_bps": 2.16,
+      "low95": -0.57,
+      "high95": 4.88,
+      "hit": 52.3
+    },
+    "feod:SPY own move, holdout": {
+      "days": 249,
+      "obs": 1494,
+      "avg_bps": -0.1,
+      "low95": -3.25,
+      "high95": 3.05,
+      "hit": 48.1
+    },
+    "feod:Disagree subset, development": {
+      "days": 667,
+      "obs": 1927,
+      "avg_bps": 7.51,
+      "low95": 2.63,
+      "high95": 12.38,
+      "hit": 52.4
+    },
+    "feod:Disagree subset, holdout": {
+      "days": 156,
+      "obs": 470,
+      "avg_bps": 7.93,
+      "low95": 0.6,
+      "high95": 15.27,
+      "hit": 55.7
+    },
+    "feod:Lead >= 0.10%, development": {
+      "days": 959,
+      "obs": 4537,
+      "avg_bps": 3.17,
+      "low95": -0.01,
+      "high95": 6.34,
+      "hit": 55.3
+    },
+    "feod:Lead >= 0.10%, holdout": {
+      "days": 238,
+      "obs": 1128,
+      "avg_bps": 0.54,
+      "low95": -3.66,
+      "high95": 4.74,
+      "hit": 52.0
+    },
+    "reg:Development": {
+      "lead": 2.19,
+      "lead_t": 1.63,
+      "rs": 0.59,
+      "rs_t": 0.42
+    },
+    "reg:Holdout": {
+      "lead": -1.31,
+      "lead_t": -0.96,
+      "rs": -0.17,
+      "rs_t": -0.17
+    }
+  },
+  "pass": false,
+  "part_b": {
+    "All trades": {
+      "n": 204,
+      "win": 32.4,
+      "avg": 27.7,
+      "total": 5649
+    },
+    "Rule agrees": {
+      "n": 128,
+      "win": 33.6,
+      "avg": 41.3,
+      "total": 5291
+    },
+    "Rule says skip": {
+      "n": 76,
+      "win": 30.3,
+      "avg": 4.7,
+      "total": 358
+    },
+    "diff": {
+      "avg": 36.6,
+      "low95": -5.7,
+      "high95": 78.9
+    }
+  }
+}
