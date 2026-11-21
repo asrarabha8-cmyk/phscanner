@@ -1,0 +1,218 @@
+{
+  "V1 contract": {
+    "groups": {
+      "Development": {
+        "n": 483,
+        "win": 40.0,
+        "avg": -12.8,
+        "low95": -23.0,
+        "total": -6192
+      },
+      "Dev first half": {
+        "n": 241,
+        "win": 39.8,
+        "avg": -12.6,
+        "low95": -28.0,
+        "total": -3035
+      },
+      "Dev second half": {
+        "n": 242,
+        "win": 40.1,
+        "avg": -13.0,
+        "low95": -26.3,
+        "total": -3157
+      },
+      "Calls (dev)": {
+        "n": 238,
+        "win": 41.6,
+        "avg": -13.6,
+        "low95": -28.3,
+        "total": -3227
+      },
+      "Puts (dev)": {
+        "n": 245,
+        "win": 38.4,
+        "avg": -12.1,
+        "low95": -26.1,
+        "total": -2965
+      },
+      "Test": {
+        "n": 167,
+        "win": 34.7,
+        "avg": -19.4,
+        "low95": -31.2,
+        "total": -3232
+      },
+      "Random entries (all)": {
+        "n": 654,
+        "win": 33.3,
+        "avg": -43.1,
+        "low95": -51.5,
+        "total": -28160
+      }
+    },
+    "passed": false
+  },
+  "V2 stock": {
+    "groups": {
+      "Development": {
+        "n": 403,
+        "win": 37.5,
+        "avg": -12.1,
+        "low95": -21.5,
+        "total": -4888
+      },
+      "Dev first half": {
+        "n": 201,
+        "win": 36.8,
+        "avg": -9.8,
+        "low95": -24.1,
+        "total": -1976
+      },
+      "Dev second half": {
+        "n": 202,
+        "win": 38.1,
+        "avg": -14.4,
+        "low95": -26.7,
+        "total": -2913
+      },
+      "Calls (dev)": {
+        "n": 190,
+        "win": 39.5,
+        "avg": -11.6,
+        "low95": -25.5,
+        "total": -2196
+      },
+      "Puts (dev)": {
+        "n": 213,
+        "win": 35.7,
+        "avg": -12.6,
+        "low95": -25.3,
+        "total": -2693
+      },
+      "Test": {
+        "n": 141,
+        "win": 34.8,
+        "avg": -19.2,
+        "low95": -32.7,
+        "total": -2706
+      },
+      "Random entries (all)": {
+        "n": 545,
+        "win": 31.2,
+        "avg": -48.5,
+        "low95": -57.9,
+        "total": -26411
+      }
+    },
+    "passed": false
+  },
+  "V3 both": {
+    "groups": {
+      "Development": {
+        "n": 395,
+        "win": 37.5,
+        "avg": -12.8,
+        "low95": -22.0,
+        "total": -5048
+      },
+      "Dev first half": {
+        "n": 197,
+        "win": 35.5,
+        "avg": -12.8,
+        "low95": -26.8,
+        "total": -2518
+      },
+      "Dev second half": {
+        "n": 198,
+        "win": 39.4,
+        "avg": -12.8,
+        "low95": -24.9,
+        "total": -2530
+      },
+      "Calls (dev)": {
+        "n": 184,
+        "win": 39.1,
+        "avg": -14.7,
+        "low95": -28.5,
+        "total": -2711
+      },
+      "Puts (dev)": {
+        "n": 211,
+        "win": 36.0,
+        "avg": -11.1,
+        "low95": -23.5,
+        "total": -2337
+      },
+      "Test": {
+        "n": 140,
+        "win": 35.0,
+        "avg": -17.4,
+        "low95": -30.2,
+        "total": -2442
+      },
+      "Random entries (all)": {
+        "n": 553,
+        "win": 31.5,
+        "avg": -51.5,
+        "low95": -61.9,
+        "total": -28455
+      }
+    },
+    "passed": false
+  },
+  "V4 decay-free": {
+    "groups": {
+      "Development": {
+        "n": 450,
+        "win": 39.1,
+        "avg": -14.3,
+        "low95": -24.3,
+        "total": -6450
+      },
+      "Dev first half": {
+        "n": 225,
+        "win": 37.3,
+        "avg": -13.9,
+        "low95": -29.0,
+        "total": -3137
+      },
+      "Dev second half": {
+        "n": 225,
+        "win": 40.9,
+        "avg": -14.7,
+        "low95": -27.9,
+        "total": -3313
+      },
+      "Calls (dev)": {
+        "n": 222,
+        "win": 41.0,
+        "avg": -13.0,
+        "low95": -27.7,
+        "total": -2886
+      },
+      "Puts (dev)": {
+        "n": 228,
+        "win": 37.3,
+        "avg": -15.6,
+        "low95": -29.3,
+        "total": -3564
+      },
+      "Test": {
+        "n": 158,
+        "win": 36.1,
+        "avg": -16.1,
+        "low95": -28.9,
+        "total": -2548
+      },
+      "Random entries (all)": {
+        "n": 612,
+        "win": 34.8,
+        "avg": -42.3,
+        "low95": -51.0,
+        "total": -25895
+      }
+    },
+    "passed": false
+  }
+}
