@@ -1,0 +1,72 @@
+name: RSI Contract Test
+
+on:
+  push:
+    branches: [rsi-contract-bt]
+    paths:
+      - research/rsi_contract/rsi_test.py
+      - .github/workflows/rsi_contract.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rsi-contract-bt
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install --quiet pandas numpy requests
+      - name: Fetch contracts
+        env:
+          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+          MODE: fetch
+        run: python research/rsi_contract/rsi_test.py
+      - name: Save cache
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add research/rsi_contract/cache.json || true
+          git diff --cached --quiet || git commit -m "Add RSI contract option bars"
+          git pull --rebase origin rsi-contract-bt && git push origin HEAD:rsi-contract-bt
+
+  analyze:
+    needs: fetch
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: git pull --rebase origin rsi-contract-bt
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install --quiet pandas numpy requests
+      - name: Analyze
+        env:
+          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+        run: python research/rsi_contract/rsi_test.py
+      - name: Save results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add research/rsi_contract
+          git diff --cached --quiet || git commit -m "Add RSI contract results"
+          git pull --rebase origin rsi-contract-bt && git push origin HEAD:rsi-contract-bt
