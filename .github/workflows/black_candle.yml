@@ -1,0 +1,41 @@
+name: Black Candle Test
+
+on:
+  push:
+    branches: [black-candle-bt]
+    paths:
+      - research/black_candle/black_test.py
+      - .github/workflows/black_candle.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install --quiet pandas numpy requests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+
+      - name: Run backtest
+        env:
+          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+        run: python research/black_candle/black_test.py
+
+      - name: Save results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add research/black_candle
+          git diff --cached --quiet || git commit -m "Add black candle results"
+          git pull --rebase origin black-candle-bt && git push origin HEAD:black-candle-bt
