@@ -80,6 +80,9 @@ def features(df):
     df["avgv30"] = g["v"].transform(lambda x: x.rolling(30).mean())
     df["perf1m"] = g["c"].transform(lambda x: x / x.shift(21) - 1) * 100
     df["next_open"] = g["o"].shift(-1)
+    df["next_high"] = g["h"].shift(-1)
+    df["next_low"] = g["l"].shift(-1)
+    df["next_close"] = g["c"].shift(-1)
     for h in (5, 20, 60):
         df[f"c{h}"] = g["c"].shift(-h)
     hi = g["h"]
@@ -168,6 +171,28 @@ def main():
     lines += [f"| {k} | {v['days']} | {v['avg']}% | {v['low95']}% | {v['pos']}% |" for k, v in g.items()]
     ok = bool(g["Development"]["low95"] > 0 and g["Dev first half"]["avg"] > 0 and g["Dev second half"]["avg"] > 0 and g["Holdout"]["avg"] > 0)
     lines += ["", f"Verdict: {'PASS' if ok else 'FAIL'}.", ""]
+    # Day trading: buy the next day's open, sell the same day's close
+    for frame in (sig, base):
+        frame["day_ret"] = (frame["next_close"] / frame["next_open"] - 1) * 100
+        frame["day_up"] = (frame["next_high"] / frame["next_open"] - 1) * 100
+        frame["day_dn"] = (frame["next_low"] / frame["next_open"] - 1) * 100
+    lines += ["## Day trading the next day (open to close)", "",
+              "| Group | Count | Avg open-to-close | Win | Avg best high | Avg worst low | High reached +3% | +5% |",
+              "|---|---|---|---|---|---|---|---|"]
+    for name, x in (("Signals, development", sig[sig["date"] < cut]), ("Signals, holdout", sig[sig["date"] >= cut]),
+                    ("Baseline, development", base[base["date"] < cut]), ("Baseline, holdout", base[base["date"] >= cut])):
+        lines.append(f"| {name} | {len(x)} | {x['day_ret'].mean():.2f}% | {100 * (x['day_ret'] > 0).mean():.0f}% | "
+                     f"{x['day_up'].mean():.2f}% | {x['day_dn'].mean():.2f}% | {100 * (x['day_up'] >= 3).mean():.0f}% | "
+                     f"{100 * (x['day_up'] >= 5).mean():.0f}% |")
+    dex = (sig.groupby("date")["day_ret"].mean() - base.groupby("date")["day_ret"].mean()).dropna()
+    dd, dh = dex[dex.index < cut], dex[dex.index >= cut]
+    dhalf = len(dd) // 2
+    gd = {"Development": st(dd), "Dev first half": st(dd.iloc[:dhalf]), "Dev second half": st(dd.iloc[dhalf:]), "Holdout": st(dh)}
+    lines += ["", "Day-trading excess over the baseline, averaged by signal day:", "",
+              "| Group | Days | Avg excess | Low 95% | Days positive |", "|---|---|---|---|---|"]
+    lines += [f"| {k} | {v['days']} | {v['avg']}% | {v['low95']}% | {v['pos']}% |" for k, v in gd.items()]
+    okd = bool(gd["Development"]["low95"] > 0 and gd["Dev first half"]["avg"] > 0 and gd["Dev second half"]["avg"] > 0 and gd["Holdout"]["avg"] > 0)
+    lines += ["", f"Day-trading verdict: {'PASS' if okd else 'FAIL'}.", ""]
     top = sig.groupby("sym")["r20"].agg(["count", "mean"]).sort_values("count", ascending=False).head(10)
     lines += ["Most frequent symbols: " + ", ".join(f"{s} ({int(r['count'])})" for s, r in top.iterrows()), ""]
     (OUT / "results.md").write_text("\n".join(lines))
